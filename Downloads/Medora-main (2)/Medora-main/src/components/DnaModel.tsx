@@ -34,15 +34,15 @@ export default function DnaModel() {
     });
   }, []);
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     if (groupRef.current) {
       // Base rotation
       groupRef.current.rotation.y += delta * 0.5;
-      
+
       // Interactive rotation based on mouse
       const targetRotationX = (pointer.y * Math.PI) / 8;
       const targetRotationZ = -(pointer.x * Math.PI) / 8;
-      
+
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetRotationX, 0.1);
       groupRef.current.rotation.z = THREE.MathUtils.lerp(groupRef.current.rotation.z, targetRotationZ, 0.1);
     }
@@ -55,13 +55,13 @@ export default function DnaModel() {
         {helix1.map((pos, i) => (
           <mesh key={`h1-${i}`} position={pos}>
             <sphereGeometry args={[0.3, 16, 16]} />
-            <meshPhysicalMaterial 
-               color="#06b6d4" 
-               emissive="#06b6d4"
-               emissiveIntensity={0.5}
-               roughness={0.2} 
-               metalness={0.8} 
-               clearcoat={1}
+            <meshPhysicalMaterial
+              color="#06b6d4"
+              emissive="#06b6d4"
+              emissiveIntensity={0.5}
+              roughness={0.2}
+              metalness={0.8}
+              clearcoat={1}
             />
           </mesh>
         ))}
@@ -69,13 +69,13 @@ export default function DnaModel() {
         {helix2.map((pos, i) => (
           <mesh key={`h2-${i}`} position={pos}>
             <sphereGeometry args={[0.3, 16, 16]} />
-            <meshPhysicalMaterial 
-               color="#a855f7" 
-               emissive="#a855f7"
-               emissiveIntensity={0.5}
-               roughness={0.2} 
-               metalness={0.8}
-               clearcoat={1}
+            <meshPhysicalMaterial
+              color="#a855f7"
+              emissive="#a855f7"
+              emissiveIntensity={0.5}
+              roughness={0.2}
+              metalness={0.8}
+              clearcoat={1}
             />
           </mesh>
         ))}
@@ -86,12 +86,12 @@ export default function DnaModel() {
           return (
             <mesh key={`conn-${i}`} position={pos.clone().lerp(helix2[i], 0.5)} rotation={[0, 0, Math.PI / 2]}>
               <cylinderGeometry args={[0.05, 0.05, distance, 8]} />
-              <meshPhysicalMaterial 
-                 color="#ffffff" 
-                 transparent 
-                 opacity={0.3} 
-                 emissive="#ffffff"
-                 emissiveIntensity={0.2}
+              <meshPhysicalMaterial
+                color="#ffffff"
+                transparent
+                opacity={0.3}
+                emissive="#ffffff"
+                emissiveIntensity={0.2}
               />
               {/* Rotate cylinder to bridge exactly across the gap */}
               <primitive object={new THREE.Mesh()} />
