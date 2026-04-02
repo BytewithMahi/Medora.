@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, LogOut, ArrowLeft, RefreshCw, Lock, ShieldCheck, Download, Upload, AlertCircle, MessageSquare } from 'lucide-react';
+import { Send, LogOut, ArrowLeft, RefreshCw, Lock, ShieldCheck, Download, Upload, AlertCircle, MessageSquare, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { encryptMessage, decryptMessage } from '../lib/crypto';
 
@@ -133,40 +133,45 @@ const MedoraChat: React.FC<MedoraChatProps> = ({ currentUserEmail, currentUserRo
       const contactList: Contact[] = [];
 
       for (const medId of uniqueMedicineIds) {
-         // Get preceding role in chain
-         let precedingRole = '';
-         if (currentUserRole === 'Customer') precedingRole = 'Retailer';
-         else if (currentUserRole === 'Retailer') precedingRole = 'Distributor';
-         else if (currentUserRole === 'Distributor') precedingRole = 'Manufacturer';
-
-         if (!precedingRole) continue; // Manufacturer has no preceding nodes
-
-         const { data: precedingEvents, error: precError } = await supabase
+         // Fetch ALL other actors who interacted with this same batch
+         const { data: allEvents, error: evError } = await supabase
             .from('ledger_events')
-            .select('actor_email, details')
-            .eq('medicine_id', medId)
-            .eq('role', precedingRole);
+            .select('actor_email, role')
+            .eq('medicine_id', medId);
 
-         if (precError) continue;
+         if (evError) continue;
 
-         for (const prec of precedingEvents) {
-            if (prec.actor_email && prec.actor_email !== currentUserEmail) {
+         for (const evt of allEvents) {
+            if (evt.actor_email && evt.actor_email !== currentUserEmail) {
                 // Fetch User Details to get Name
                 const { data: userData } = await supabase
                     .from('users')
                     .select('name')
-                    .eq('email', prec.actor_email)
+                    .eq('email', evt.actor_email)
                     .single();
 
                 // Get Batch No
                 const batchEvent = userEvents.find(e => e.medicine_id === medId);
                 const batchNo = (batchEvent?.medicine as any)?.batch_no || 'Unknown';
 
-                if (!contactList.find(c => c.email === prec.actor_email)) {
+                // Map DB Event to simple string
+                let simpleRole = 'Network Node';
+                if (evt.role === 'Producer Initialization') simpleRole = 'Manufacturer';
+                if (evt.role === 'Distributor Verification') simpleRole = 'Distributor';
+                if (evt.role === 'Retailer Verification') simpleRole = 'Retailer';
+                if (evt.role === 'Consumer Scan') simpleRole = 'Customer';
+
+                // Strict Adjacent-Node Communication ACL
+                if (currentUserRole === 'Customer' && simpleRole !== 'Retailer') continue;
+                if (currentUserRole === 'Retailer' && simpleRole !== 'Distributor' && simpleRole !== 'Customer') continue;
+                if (currentUserRole === 'Distributor' && simpleRole !== 'Manufacturer' && simpleRole !== 'Retailer') continue;
+                if (currentUserRole === 'Manufacturer' && simpleRole !== 'Distributor') continue;
+
+                if (!contactList.find(c => c.email === evt.actor_email)) {
                     contactList.push({
-                        email: prec.actor_email,
-                        name: userData?.name || prec.actor_email,
-                        role: precedingRole,
+                        email: evt.actor_email,
+                        name: userData?.name || evt.actor_email.split('@')[0],
+                        role: simpleRole,
                         batch_no: batchNo
                     });
                 }
@@ -316,6 +321,16 @@ const MedoraChat: React.FC<MedoraChatProps> = ({ currentUserEmail, currentUserRo
     reader.readAsText(file);
   };
 
+  const clearLocalHistory = () => {
+    if (window.confirm("Are you sure you want to permanently clear your local chat history? This cannot be undone unless you have a backup.")) {
+      localStorage.removeItem(localStorageKey);
+      setMessages([]);
+      setSuccess("Chat history cleared.");
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000);
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-100px)] w-full max-w-6xl mx-auto glassmorphism-dark rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
       {/* Sidebar: Contact List */}
@@ -363,6 +378,9 @@ const MedoraChat: React.FC<MedoraChatProps> = ({ currentUserEmail, currentUserRo
             <Upload className="w-3.5 h-3.5 text-secondary" /> Restore
             <input type="file" accept=".json" onChange={importBackup} className="hidden" />
           </label>
+          <button onClick={clearLocalHistory} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 font-semibold transition-all text-red-400">
+            <Trash2 className="w-3.5 h-3.5" /> Clear
+          </button>
         </div>
       </div>
 

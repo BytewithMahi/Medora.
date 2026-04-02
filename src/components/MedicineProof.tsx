@@ -1,13 +1,11 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldAlert, Fingerprint, Activity, Mail, Phone, AlertTriangle, CheckCircle2, Factory, Truck, Store, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ShieldAlert, Fingerprint, Activity, Mail, Phone, CheckCircle2, Factory, Truck, Store, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 export default function MedicineProof() {
   const [scanCount, setScanCount] = useState(0);
-  const [hash, setHash] = useState('0x7a8b...9c21');
-  const [isFraud, setIsFraud] = useState(false);
-  const [testerAlert, setTesterAlert] = useState(false);
+  const [hash] = useState('0x7a8b...9c21');
   const [ledgerEvents, setLedgerEvents] = useState<any[]>([]);
   const [medicineData, setMedicineData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,18 +68,11 @@ export default function MedicineProof() {
   // Simulate scanning updates
   useEffect(() => {
     const timer = setInterval(() => {
-      setScanCount(prev => {
-        const next = prev + 1;
-        if (next > 10 && !isFraud) {
-          setIsFraud(true);
-          setHash('0xDEAD...FRAUD');
-        }
-        return next;
-      });
+      setScanCount(prev => prev + 1);
     }, 2000); // increment scan every 2 seconds for demo
 
     return () => clearInterval(timer);
-  }, [isFraud]);
+  }, []);
 
   return (
     <section className="relative py-24 px-4 z-10 w-full min-h-screen max-w-7xl mx-auto flex flex-col items-center">
@@ -181,15 +172,9 @@ export default function MedicineProof() {
               animate={{ opacity: 1 }}
               className="relative mt-12"
             >
-              <div className={`absolute -left-[35px] top-6 w-6 h-6 rounded-full border-4 border-[#020617] flex items-center justify-center transition-colors duration-500
-                ${testerAlert ? 'bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)]' : 'bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]'}`
-              } />
+                <div className="absolute -left-[35px] top-6 w-6 h-6 rounded-full border-4 border-[#020617] flex items-center justify-center bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]" />
 
-              <div className={`p-6 rounded-2xl border transition-all duration-500
-                ${testerAlert
-                  ? 'bg-red-500/10 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.2)]'
-                  : 'glassmorphism border-purple-500/30'}`}
-              >
+              <div className="p-6 rounded-2xl border glassmorphism border-purple-500/30">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <h4 className="text-lg font-bold text-white flex items-center gap-2">
@@ -197,46 +182,12 @@ export default function MedicineProof() {
                     </h4>
                     <p className="text-xs text-slate-400 mt-1">Independent Government/Private Validation</p>
                   </div>
-                  <button
-                    onClick={() => setTesterAlert(!testerAlert)}
-                    className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-xs text-white transition-colors"
-                  >
-                    {testerAlert ? 'Reset Status' : 'Simulate Objection'}
-                  </button>
                 </div>
 
-                <AnimatePresence mode="wait">
-                  {testerAlert ? (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="bg-red-950/50 rounded-lg p-4 border border-red-500/20"
-                    >
-                      <div className="flex items-start gap-3 text-red-400">
-                        <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <strong className="block mb-1 text-red-300">OBJECTION FILED: Suspicious Circumstances Detected</strong>
-                          <p className="text-sm text-red-200/80 mb-3">Independent tester 'GovReg-094' has marked this batch as false.</p>
-                          <div className="bg-red-500/20 px-3 py-2 rounded border border-red-500/30 text-xs text-red-100 flex items-center gap-2">
-                            <Mail className="w-4 h-4" />
-                            Auto-generated Warning Mails Dispatched to: Producer, Distributor, Retailer, & Consumer.
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="text-sm text-slate-400 flex items-center gap-2"
-                    >
-                      <ShieldAlert className="w-4 h-4 text-purple-400" />
-                      No objections filed. Routine sampling active.
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <div className="text-sm text-slate-400 flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-purple-400" />
+                  No objections filed. Routine sampling active.
+                </div>
               </div>
             </motion.div>
           </div>
@@ -252,15 +203,8 @@ export default function MedicineProof() {
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className={`relative p-8 rounded-3xl border backdrop-blur-xl overflow-hidden transition-all duration-700
-              ${isFraud || testerAlert
-                ? 'bg-red-900/20 border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.3)]'
-                : 'glassmorphism border-white/10'}`}
+            className="relative p-8 rounded-3xl border backdrop-blur-xl overflow-hidden transition-all duration-700 glassmorphism border-white/10"
           >
-            {/* Background warning pulse if fraud */}
-            {(isFraud || testerAlert) && (
-              <div className="absolute inset-0 bg-red-500/10 animate-[pulse_1s_ease-in-out_infinite]" />
-            )}
 
             <div className="relative z-10 flex flex-col items-center text-center">
               <h4 className="text-slate-300 uppercase tracking-widest text-sm font-semibold mb-6">Unique QR Scan Count</h4>
@@ -278,7 +222,7 @@ export default function MedicineProof() {
                   <motion.circle
                     cx="96" cy="96" r="88"
                     fill="none"
-                    stroke={isFraud || testerAlert ? '#ef4444' : '#06b6d4'}
+                    stroke="#06b6d4"
                     strokeWidth="8"
                     strokeDasharray={2 * Math.PI * 88}
                     strokeDashoffset={2 * Math.PI * 88 * (1 - Math.min(scanCount, 10) / 10)}
@@ -288,25 +232,13 @@ export default function MedicineProof() {
                 </svg>
 
                 <div className="flex flex-col items-center">
-                  <span className={`text-6xl font-black tabular-nums transition-colors duration-300 ${isFraud || testerAlert ? 'text-red-400' : 'text-white'}`}>
+                  <span className="text-6xl font-black tabular-nums transition-colors duration-300 text-white">
                     {scanCount}
                   </span>
                   <span className="text-slate-400 text-sm mt-1">/ 10 Limit</span>
                 </div>
               </div>
 
-              {/* Status Message */}
-              <AnimatePresence mode="wait">
-                {(isFraud || testerAlert) ? (
-                  <motion.div
-                    key="fraud"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-2 text-red-400 font-bold text-lg bg-red-500/10 px-6 py-3 rounded-full border border-red-500/20"
-                  >
-                    <AlertTriangle className="w-6 h-6 animate-bounce" /> TRYING OF FRAUDS
-                  </motion.div>
-                ) : (
                   <motion.div
                     key="safe"
                     initial={{ opacity: 0, y: 10 }}
@@ -315,8 +247,6 @@ export default function MedicineProof() {
                   >
                     Scan volume nominal.
                   </motion.div>
-                )}
-              </AnimatePresence>
             </div>
           </motion.div>
 
@@ -324,18 +254,12 @@ export default function MedicineProof() {
           <div className="glassmorphism p-6 rounded-2xl border border-white/5 relative overflow-hidden">
             <h4 className="text-slate-300 uppercase tracking-widest text-sm font-semibold mb-4">Live Ledger Hash</h4>
 
-            <div className={`font-mono text-sm md:text-base break-all p-4 rounded-xl border transition-colors duration-500
-              ${isFraud || testerAlert
-                ? 'bg-red-950/50 border-red-500/30 text-red-400 shadow-[inset_0_0_20px_rgba(239,68,68,0.2)]'
-                : 'bg-black/50 border-cyan-500/30 text-cyan-300 shadow-[inset_0_0_20px_rgba(6,182,212,0.1)]'}`}
-            >
+            <div className="font-mono text-sm md:text-base break-all p-4 rounded-xl border transition-colors duration-500 bg-black/50 border-cyan-500/30 text-cyan-300 shadow-[inset_0_0_20px_rgba(6,182,212,0.1)]">
               {hash}
             </div>
 
             <p className="text-xs text-slate-400 mt-4 leading-relaxed">
-              {(isFraud || testerAlert)
-                ? 'Hash appended and locked. Form proven FALSE due to fraud trigger.'
-                : 'Hash maintains integrity. Appends only upon authorized party validation.'}
+              Hash maintains integrity. Appends only upon authorized party validation.
             </p>
           </div>
 

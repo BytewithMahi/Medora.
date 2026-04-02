@@ -11,7 +11,7 @@ const generateToken = () => {
     return Math.random().toString(16).substring(2, 10).toUpperCase();
 };
 
-export default function ManufacturerDashboard() {
+export default function ManufacturerDashboard({ userEmail }: { userEmail?: string }) {
     const [isGenerated, setIsGenerated] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
@@ -22,7 +22,6 @@ export default function ManufacturerDashboard() {
     });
 
     const [isGenerating, setIsGenerating] = useState(false);
-    const [qrToken, setQrToken] = useState('');
     const [qrUrl, setQrUrl] = useState('');
 
     const handleGenerate = async (e: React.FormEvent) => {
@@ -33,7 +32,8 @@ export default function ManufacturerDashboard() {
 
         try {
             const token = generateToken();
-            const verificationUrl = `${window.location.origin}/?verify=true&batch=${formData.batch}&token=${token}`;
+            const BASE_URL = import.meta.env.VITE_BASE_URL || window.location.origin;
+            const verificationUrl = `${BASE_URL}/verify?batch=${formData.batch}&token=${token}`;
 
             // 1. Insert medicine record
             const { data: medicine, error: medError } = await supabase
@@ -73,13 +73,12 @@ export default function ManufacturerDashboard() {
                         'Expiry Date': formData.expDate,
                         'Batch No': formData.batch,
                     },
-                    actor_email: 'ops@medorapharma.com', 
+                    actor_email: userEmail || 'ops@medorapharma.com', 
                     actor_phone: '+1-555-0192'
                 }]);
 
             if (eventError) throw eventError;
 
-            setQrToken(token);
             setQrUrl(verificationUrl);
             setIsGenerated(true);
         } catch (error) {
@@ -242,6 +241,12 @@ export default function ManufacturerDashboard() {
                                     <QrCode className="w-16 h-16 text-black/20" />
                                 )}
                             </div>
+
+                            {isGenerated && qrUrl && (
+                                <p className="text-[10px] text-white/40 mb-4 px-2 max-w-full break-all font-mono relative z-10">
+                                    {qrUrl}
+                                </p>
+                            )}
 
                             <button onClick={handleDownloadQR} disabled={!isGenerated} className={`relative z-10 px-6 py-2 rounded-full font-semibold transition-all ${isGenerated ? 'bg-white/10 text-white hover:bg-white/20 border border-white/20 hover:scale-105' : 'bg-white/5 text-white/30 cursor-not-allowed'}`}>
                                 Download QR PNG

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle, XCircle, FileText, Activity } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle, FileText, Activity } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface VerificationPageProps {
@@ -20,14 +20,28 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
     const [verifying, setVerifying] = useState(false);
     const [verifiedSuccess, setVerifiedSuccess] = useState(false);
 
-    const [checklist, setChecklist] = useState({
-        batchMatch: false,
-        expiryMatch: false,
-        compositionMatch: false
+    const [checklist, setChecklist] = useState<{
+        batchMatch: 'Yes' | 'No' | null,
+        expiryMatch: 'Yes' | 'No' | null,
+        compositionMatch: 'Yes' | 'No' | null
+    }>({
+        batchMatch: null,
+        expiryMatch: null,
+        compositionMatch: null
     });
+    const [location, setLocation] = useState<{latitude: number, longitude: number} | null>(null);
+
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
     useEffect(() => {
         validateQR();
+        // Capture Location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+                (err) => console.warn("Location capture failed", err)
+            );
+        }
     }, [batch, token]);
 
     const validateQR = async () => {
@@ -75,35 +89,35 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
 
     const handleVerifyAction = async () => {
         if (!medicine || !currentUserRole) return;
-        if (currentUserRole !== 'Distributor' && currentUserRole !== 'Retailer') return;
+        if (currentUserRole !== 'Distributor' && currentUserRole !== 'Retailer' && currentUserRole !== 'Customer') return;
 
         setVerifying(true);
         try {
-            const roleString = currentUserRole === 'Distributor' ? 'Distributor Verification' : 'Retailer Verification';
-            const nextStatus = currentUserRole === 'Distributor' ? 'in_transit' : 'at_retailer';
+            const roleString = currentUserRole === 'Distributor' ? 'Distributor Verification' : 
+                               currentUserRole === 'Retailer' ? 'Retailer Verification' : 
+                               'Consumer Scan';
 
-            // Insert ledger event
-            const { error: eventError } = await supabase
-                .from('ledger_events')
-                .insert([{
-                    medicine_id: medicine.id,
-                    role: roleString,
-                    status: 'verified',
-                    details: {
-                        'Expiry Match': checklist.expiryMatch ? 'True' : 'False',
-                        'ID Match': checklist.batchMatch ? 'True' : 'False',
-                        'Composition Check': checklist.compositionMatch ? 'True' : 'False',
-                    },
-                    actor_email: currentEmail || 'ops@medchain.net',
-                    actor_phone: '+1-555-SCAN'
-                }]);
+            const payload = {
+                batchId: medicine.batch_no,
+                role: roleString,
+                answers: checklist,
+                location: location,
+                actorEmail: currentEmail,
+                actorPhone: '+1-555-SCAN'
+            };
 
-            if (eventError) throw eventError;
+            const response = await fetch(`${API_URL}/api/verify-action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-            // Update medicine status
-            await supabase.from('medicines').update({ status: nextStatus }).eq('id', medicine.id);
+            const result = await response.json();
 
-            setVerifiedSuccess(true);
+            if (result.success) {
+                setVerifiedSuccess(true);
+            }
+
         } catch (error) {
             console.error('Error verifying batch:', error);
             alert('Failed to submit verification to chain.');
@@ -112,7 +126,7 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
         }
     };
 
-    const isChecklistComplete = checklist.batchMatch && checklist.expiryMatch && checklist.compositionMatch;
+    const isChecklistComplete = checklist.batchMatch !== null && checklist.expiryMatch !== null && checklist.compositionMatch !== null;
 
     return (
         <div className="flex flex-col items-center justify-center -mt-8 py-8 px-4 max-w-2xl mx-auto min-h-screen">
@@ -147,13 +161,15 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
                         )}
 
                         {/* Status Guard Card */}
-                        <div className="glassmorphism-dark p-6 rounded-3xl border border-emerald-500/50 shadow-[0_0_30px_rgba(52,211,153,0.3)] text-center relative overflow-hidden">
-                            <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <ShieldCheck className="w-8 h-8 text-emerald-400" />
+                        {verifiedSuccess && (
+                            <div className="glassmorphism-dark p-6 rounded-3xl border border-emerald-500/50 shadow-[0_0_30px_rgba(52,211,153,0.3)] text-center relative overflow-hidden">
+                                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <ShieldCheck className="w-8 h-8 text-emerald-400" />
+                                </div>
+                                <h2 className="text-xl font-black text-emerald-400 mb-1">Authentic Batch Confirmed</h2>
+                                <p className="text-white/60 text-xs">Token: {token} verified against MedChain Node.</p>
                             </div>
-                            <h2 className="text-xl font-black text-emerald-400 mb-1">Authentic Batch Confirmed</h2>
-                            <p className="text-white/60 text-xs">Token: {token} verified against MedChain Node.</p>
-                        </div>
+                        )}
 
                         {/* Medicine Data */}
                         <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
@@ -173,6 +189,12 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
                                     <span className="text-white/50">Batch Number</span>
                                     <span className="text-cyan-400 font-mono font-bold">{medicine.batch_no}</span>
                                 </div>
+                                <div className="flex justify-between border-b border-white/5 pb-2">
+                                    <span className="text-white/50">Current Status</span>
+                                    <span className={`font-semibold px-2 py-0.5 rounded text-xs ${medicine.status === 'created' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                        {medicine.status === 'created' ? 'Pending' : 'Verified'}
+                                    </span>
+                                </div>
                                 <div className="flex justify-between">
                                     <span className="text-white/50">Expiry Date</span>
                                     <span className="text-rose-400 font-semibold">{medicine.expiry_date ? new Date(medicine.expiry_date).toLocaleDateString() : 'N/A'}</span>
@@ -180,8 +202,8 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
                             </div>
                         </div>
 
-                        {/* Verification checklist FOR Distributor or Retailer */}
-                        {(currentUserRole === 'Distributor' || currentUserRole === 'Retailer') && !verifiedSuccess && (
+                        {/* Verification checklist FOR Distributor, Retailer, or Customer */}
+                        {(currentUserRole === 'Distributor' || currentUserRole === 'Retailer' || currentUserRole === 'Customer') && !verifiedSuccess && (
                             <div className="glassmorphism p-6 rounded-2xl space-y-4">
                                 <p className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                                     <Activity className="w-4 h-4" /> Integrity Verification checklist
@@ -191,15 +213,33 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
                                     { id: 'expiryMatch', label: 'Verify optimal temperature chain and conditions?' },
                                     { id: 'compositionMatch', label: 'Confirm packaging seal is intact/unbroken?' }
                                 ].map((q) => (
-                                    <label key={q.id} className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all ${checklist[q.id as keyof typeof checklist] ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-black/30 border-white/5'}`}>
-                                        <input
-                                            type="checkbox"
-                                            checked={checklist[q.id as keyof typeof checklist]}
-                                            onChange={(e) => setChecklist({ ...checklist, [q.id]: e.target.checked })}
-                                            className="w-5 h-5 mt-0.5 rounded border-white/20 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-0 bg-black/50"
-                                        />
-                                        <span className={`text-sm ${checklist[q.id as keyof typeof checklist] ? 'text-white' : 'text-white/70'}`}>{q.label}</span>
-                                    </label>
+                                    <div key={q.id} className="p-4 rounded-xl border bg-black/30 border-white/5">
+                                        <p className="text-sm text-white/90 mb-3">{q.label}</p>
+                                        <div className="flex gap-4">
+                                            <label className={`flex-1 flex justify-center items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${checklist[q.id as keyof typeof checklist] === 'Yes' ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-black/50 border-white/10 text-white/50 hover:bg-white/5'}`}>
+                                                <input
+                                                    type="radio"
+                                                    name={q.id}
+                                                    value="Yes"
+                                                    checked={checklist[q.id as keyof typeof checklist] === 'Yes'}
+                                                    onChange={() => setChecklist({ ...checklist, [q.id]: 'Yes' })}
+                                                    className="hidden"
+                                                />
+                                                <span className="font-semibold text-sm">Yes</span>
+                                            </label>
+                                            <label className={`flex-1 flex justify-center items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${checklist[q.id as keyof typeof checklist] === 'No' ? 'bg-rose-500/20 border-rose-500/50 text-rose-400' : 'bg-black/50 border-white/10 text-white/50 hover:bg-white/5'}`}>
+                                                <input
+                                                    type="radio"
+                                                    name={q.id}
+                                                    value="No"
+                                                    checked={checklist[q.id as keyof typeof checklist] === 'No'}
+                                                    onChange={() => setChecklist({ ...checklist, [q.id]: 'No' })}
+                                                    className="hidden"
+                                                />
+                                                <span className="font-semibold text-sm">No</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                 ))}
 
                                 <motion.button
@@ -207,7 +247,7 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
                                     disabled={!isChecklistComplete || verifying}
                                     className={`w-full py-4 rounded-xl font-bold transition-all ${isChecklistComplete ? 'bg-cyan-500 text-black hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]' : 'bg-white/5 text-white/30 cursor-not-allowed'}`}
                                 >
-                                    {verifying ? "Syncing to Ledger..." : `Confirm & Push ${currentUserRole} Sign-off`}
+                                    {verifying ? "Syncing to Ledger..." : currentUserRole === 'Customer' ? "Authenticate Package" : `Confirm & Push ${currentUserRole} Sign-off`}
                                 </motion.button>
                             </div>
                         )}

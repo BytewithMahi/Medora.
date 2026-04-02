@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { CheckCircle, XCircle, Shield, Search, Building2, FileText, User } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle, XCircle, Shield, Search, Building2, FileText, User, Cpu, Activity, MapPin, BarChart3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface KYCData {
@@ -42,6 +42,30 @@ const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'All' | 'Pending' | 'Approved' | 'Rejected'>('Pending');
   const [selectedRequest, setSelectedRequest] = useState<RegistrationRequest | null>(null);
+  
+  // AI Tools State
+  const [aiTestResponse, setAiTestResponse] = useState<any>(null);
+  const [activeTest, setActiveTest] = useState<string | null>(null);
+  const [testingAi, setTestingAi] = useState(false);
+
+  const runAITest = async (endpoint: string, testName: string, body?: any) => {
+    setTestingAi(true);
+    setActiveTest(testName);
+    setAiTestResponse(null);
+    try {
+      const url = `http://localhost:5000/api/${endpoint}`;
+      const res = await fetch(url, {
+        method: body ? 'POST' : 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const data = await res.json();
+      setAiTestResponse({ success: true, data: data.data || data });
+    } catch (err: any) {
+      setAiTestResponse({ success: false, error: err.message });
+    }
+    setTestingAi(false);
+  };
 
   useEffect(() => {
     fetchRequests();
@@ -109,6 +133,109 @@ const AdminDashboard: React.FC = () => {
           </h1>
           <p className="text-white/60">Manage MedChain node registrations and KYC verifications.</p>
         </div>
+      </div>
+
+      {/* AI Network Admin Tools */}
+      <div className="mb-10 bg-black/40 border border-primary/20 rounded-2xl p-6 backdrop-blur-xl relative overflow-hidden">
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <Cpu className="w-6 h-6 text-primary" /> AI Intelligence Core (Live Testing)
+        </h2>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 relative z-10">
+          <button 
+            onClick={() => runAITest('ai-check', 'Fraud Analysis', { failedAttempts: 3, duplicateScans: 2, unusualActivity: true })}
+            disabled={testingAi}
+            className="flex flex-col items-center gap-2 p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all font-semibold text-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+          >
+            <Activity className="w-8 h-8 text-cyan-400 drop-shadow-[0_0_10px_rgba(6,182,212,0.8)]" />
+            <span>Fraud Detection</span>
+            <span className="text-xs font-normal text-white/40">Simulate Attack Vector</span>
+          </button>
+          
+          <button 
+            onClick={() => runAITest('geo-risk', 'Geo-Risk Check', { latitude: 35.6895, longitude: 139.6917, history: [] })}
+            disabled={testingAi}
+            className="flex flex-col items-center gap-2 p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-yellow-500/10 hover:border-yellow-500/50 transition-all font-semibold text-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+          >
+            <MapPin className="w-8 h-8 text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.8)]" />
+            <span>Geo-Risk Analysis</span>
+            <span className="text-xs font-normal text-white/40">Scan Tokyo Coordinates</span>
+          </button>
+
+          <button 
+            onClick={() => runAITest('authenticity-score', 'Master Authenticity', { verificationScore: 90, fraudScore: 1, geoRiskLevel: 'low', supplyChainValidity: 100 })}
+            disabled={testingAi}
+            className="flex flex-col items-center gap-2 p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-emerald-500/10 hover:border-emerald-500/50 transition-all font-semibold text-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+          >
+            <Shield className="w-8 h-8 text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.8)]" />
+            <span>Authentic Score</span>
+            <span className="text-xs font-normal text-white/40">Compute Master Matrix</span>
+          </button>
+
+          <button 
+            onClick={() => runAITest('predict-demand/MED-101', 'Demand Predictor')}
+            disabled={testingAi}
+            className="flex flex-col items-center gap-2 p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-purple-500/10 hover:border-purple-500/50 transition-all font-semibold text-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
+          >
+            <BarChart3 className="w-8 h-8 text-purple-400 drop-shadow-[0_0_10px_rgba(192,132,252,0.8)]" />
+            <span>Demand Prediction</span>
+            <span className="text-xs font-normal text-white/40">Forecast MED-101 Needs</span>
+          </button>
+        </div>
+
+        <AnimatePresence mode="wait">
+        {(testingAi || aiTestResponse) && (
+           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-6 overflow-hidden">
+             {testingAi ? (
+                <div className="flex flex-col items-center justify-center p-8 bg-black/40 border border-cyan-500/20 rounded-2xl text-cyan-400 gap-4">
+                  <div className="w-10 h-10 border-4 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin"></div>
+                  <p className="font-mono text-sm animate-pulse tracking-widest uppercase">Connecting to Neural Matrix...</p>
+                </div>
+             ) : !aiTestResponse.success ? (
+                <div className="p-6 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-start gap-3 text-red-400">
+                  <XCircle className="w-6 h-6 shrink-0" />
+                  <div>
+                    <h4 className="font-bold text-lg">Neural Link Failed</h4>
+                    <p className="text-sm opacity-80">{aiTestResponse.error}</p>
+                  </div>
+                </div>
+             ) : (
+                <div className="bg-black/60 border border-white/10 p-6 rounded-2xl shadow-[inset_0_0_30px_rgba(6,182,212,0.05)]">
+                  <h3 className="text-lg font-bold text-white mb-4 border-b border-white/10 pb-3 flex items-center justify-between">
+                    {activeTest} Summary
+                    <span className="text-[10px] font-mono font-bold text-cyan-400 px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded-full">LIVE AI PREDICTION</span>
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                     {Object.entries(aiTestResponse.data).map(([key, value]) => {
+                        const formattedKey = key.replace(/_/g, ' ').toUpperCase();
+                        let valueColor = "text-white";
+                        const strVal = String(value).toLowerCase();
+                        
+                        if (strVal === 'high' || (key === 'fraud_score' && Number(value) >= 3) || strVal.includes('counterfeit')) {
+                          valueColor = "text-rose-400 drop-shadow-[0_0_8px_rgba(251,113,133,0.5)]";
+                        } else if (strVal === 'low' || strVal === 'authentic' || strVal.includes('safe')) {
+                          valueColor = "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]";
+                        } else if (strVal === 'medium') {
+                          valueColor = "text-yellow-400";
+                        } else if (key === 'predicted_demand' || key === 'confidence_score' || key === 'authenticity_score') {
+                          valueColor = "text-cyan-400 text-3xl font-black"; 
+                        }
+          
+                        return (
+                           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} key={key} className="bg-white/5 hover:bg-white/10 transition-colors border border-white/10 rounded-xl p-4 flex flex-col justify-center overflow-hidden">
+                              <span className="text-white/40 text-[10px] font-bold tracking-widest mb-2 truncate">{formattedKey}</span>
+                              <span className={`font-semibold capitalize truncate ${valueColor}`}>{String(value)}</span>
+                           </motion.div>
+                        );
+                     })}
+                  </div>
+                </div>
+             )}
+           </motion.div>
+        )}
+        </AnimatePresence>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

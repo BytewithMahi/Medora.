@@ -8,9 +8,10 @@ import QRScanner from '../QRScanner';
 
 interface DistributorDashboardProps {
     onScanVerify?: (batch: string, token: string) => void;
+    userEmail?: string;
 }
 
-export default function DistributorDashboard({ onScanVerify }: DistributorDashboardProps) {
+export default function DistributorDashboard({ userEmail }: DistributorDashboardProps) {
     const [scanResult, setScanResult] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     const [isVerified, setIsVerified] = useState(false);
@@ -19,9 +20,9 @@ export default function DistributorDashboard({ onScanVerify }: DistributorDashbo
     const [isScanning, setIsScanning] = useState(false);
 
     const [questions, setQuestions] = useState({
-        batchCorrect: false,
-        expiryMatching: false,
-        compositionCorrect: false
+        batchCorrect: '',
+        expiryMatching: '',
+        compositionCorrect: ''
     });
 
     useEffect(() => {
@@ -33,13 +34,13 @@ export default function DistributorDashboard({ onScanVerify }: DistributorDashbo
 
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!scanResult || !questions.batchCorrect || !questions.expiryMatching || !questions.compositionCorrect) return;
+        if (!scanResult) return;
         
         setIsVerifying(true);
         
         try {
             // Find medicine by batch_no
-            const { data: medicine, error: findError } = await supabase
+            const { error: findError } = await supabase
                 .from('medicines')
                 .select('id')
                 .eq('batch_no', scanResult)
@@ -47,27 +48,31 @@ export default function DistributorDashboard({ onScanVerify }: DistributorDashbo
 
             if (findError) throw new Error('Batch not found');
 
-            // Insert ledger event
-            const { error: eventError } = await supabase
-                .from('ledger_events')
-                .insert([{
-                    medicine_id: medicine.id,
-                    role: 'Distributor Verification',
-                    status: 'verified',
-                    details: {
-                        'Expiry Match': questions.expiryMatching ? 'True' : 'False',
-                        'ID Match': questions.batchCorrect ? 'True' : 'False',
-                        'Composition Check': questions.compositionCorrect ? 'True' : 'False',
-                        'Cold Chain Intact': 'True', // From mock UI
-                    },
-                    actor_email: 'logistics@globaldist.net',
-                    actor_phone: '+1-555-8831'
-                }]);
+            const payload = {
+                batchId: scanResult,
+                role: 'Distributor Verification',
+                answers: {
+                    'Expiry Match': questions.expiryMatching === 'yes' ? 'True' : (questions.expiryMatching === 'no' ? 'False' : 'N/A'),
+                    'ID Match': questions.batchCorrect === 'yes' ? 'True' : (questions.batchCorrect === 'no' ? 'False' : 'N/A'),
+                    'Composition Check': questions.compositionCorrect === 'yes' ? 'True' : (questions.compositionCorrect === 'no' ? 'False' : 'N/A'),
+                    'Cold Chain Intact': 'True', // From mock UI
+                },
+                location: { latitude: 40.71, longitude: -74.00 }, // Mock
+                actorEmail: userEmail || 'logistics@globaldist.net',
+                actorPhone: '+1-555-8831'
+            };
 
-            if (eventError) throw eventError;
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const response = await fetch(`${API_URL}/api/verify-action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-            // Update medicine status
-            await supabase.from('medicines').update({ status: 'in_transit' }).eq('id', medicine.id);
+            const result = await response.json();
+
+            if (!result.success) throw new Error(result.error || 'Verification failed');
+
 
             setIsVerified(true);
             setTimestamp(new Date().toLocaleString());
@@ -79,7 +84,7 @@ export default function DistributorDashboard({ onScanVerify }: DistributorDashbo
         }
     };
 
-    const allQuestionsChecked = questions.batchCorrect && questions.expiryMatching && questions.compositionCorrect;
+    const isFormValid = !!scanResult;
 
     return (
         <div className="relative w-full min-h-screen bg-background text-foreground overflow-hidden pt-24 pb-12 px-4 sm:px-6 lg:px-8">
@@ -160,26 +165,40 @@ export default function DistributorDashboard({ onScanVerify }: DistributorDashbo
                                     { id: 'expiryMatching', label: 'Is the expiry date clearly printed and matching?' },
                                     { id: 'compositionCorrect', label: 'Are the storage temperature and composition stable?' }
                                 ].map((q) => (
-                                    <label key={q.id} className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all ${questions[q.id as keyof typeof questions] ? 'bg-purple-500/10 border-purple-500/50' : 'bg-black/30 border-white/5 hover:border-white/20'}`}>
-                                        <div className="mt-0.5">
-                                            <input
-                                                type="checkbox"
-                                                checked={questions[q.id as keyof typeof questions]}
-                                                onChange={(e) => setQuestions({ ...questions, [q.id]: e.target.checked })}
-                                                className="w-5 h-5 rounded border-white/20 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 bg-black/50"
-                                            />
-                                        </div>
+                                    <div key={q.id} className={`flex flex-col gap-3 p-4 rounded-xl border transition-all ${questions[q.id as keyof typeof questions] ? 'bg-purple-500/10 border-purple-500/50' : 'bg-black/30 border-white/5'}`}>
                                         <span className={`text-sm ${questions[q.id as keyof typeof questions] ? 'text-white' : 'text-white/70'}`}>{q.label}</span>
-                                    </label>
+                                        <div className="flex gap-4">
+                                            <label className="flex items-center gap-2 cursor-pointer text-sm text-white/80 hover:text-white">
+                                                <input
+                                                    type="radio"
+                                                    name={q.id}
+                                                    value="yes"
+                                                    checked={questions[q.id as keyof typeof questions] === 'yes'}
+                                                    onChange={(e) => setQuestions({ ...questions, [q.id]: e.target.value })}
+                                                    className="w-4 h-4 text-purple-500 bg-black/50 border-white/20 focus:ring-purple-500 focus:ring-offset-0"
+                                                /> Yes
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer text-sm text-white/80 hover:text-white">
+                                                <input
+                                                    type="radio"
+                                                    name={q.id}
+                                                    value="no"
+                                                    checked={questions[q.id as keyof typeof questions] === 'no'}
+                                                    onChange={(e) => setQuestions({ ...questions, [q.id]: e.target.value })}
+                                                    className="w-4 h-4 text-purple-500 bg-black/50 border-white/20 focus:ring-purple-500 focus:ring-offset-0"
+                                                /> No
+                                            </label>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
 
                             <motion.button
-                                whileHover={allQuestionsChecked && scanResult ? { scale: 1.02 } : {}}
-                                whileTap={allQuestionsChecked && scanResult ? { scale: 0.98 } : {}}
-                                disabled={!allQuestionsChecked || !scanResult || isVerified || isVerifying}
+                                whileHover={isFormValid ? { scale: 1.02 } : {}}
+                                whileTap={isFormValid ? { scale: 0.98 } : {}}
+                                disabled={!isFormValid || isVerified || isVerifying}
                                 type="submit"
-                                className={`w-full relative overflow-hidden rounded-xl font-bold py-4 mt-8 transition-all ${isVerified ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : (allQuestionsChecked && scanResult ? 'bg-purple-500 text-white hover:shadow-[0_0_30px_rgba(168,85,247,0.5)]' : 'bg-white/5 text-white/30 cursor-not-allowed')}`}
+                                className={`w-full relative overflow-hidden rounded-xl font-bold py-4 mt-8 transition-all ${isVerified ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : (isFormValid ? 'bg-purple-500 text-white hover:shadow-[0_0_30px_rgba(168,85,247,0.5)]' : 'bg-white/5 text-white/30 cursor-not-allowed')}`}
                             >
                                 {isVerifying ? (
                                     <span className="flex items-center justify-center gap-2">
@@ -282,9 +301,9 @@ export default function DistributorDashboard({ onScanVerify }: DistributorDashbo
                                     setScanResult(batch);
                                     setIsVerified(false);
                                     setQuestions({
-                                        batchCorrect: false,
-                                        expiryMatching: false,
-                                        compositionCorrect: false
+                                        batchCorrect: '',
+                                        expiryMatching: '',
+                                        compositionCorrect: ''
                                     });
                                 } else {
                                     alert('Invalid QR formulation. No batch found.');

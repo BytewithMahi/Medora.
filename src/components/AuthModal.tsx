@@ -8,7 +8,8 @@ interface AuthModalProps {
     isOpen: boolean;
     onClose: () => void;
     initialMode: 'login' | 'register';
-    onLogin?: (role: Role, email: string) => void;
+    initialRole?: Role;
+    onLogin?: (role: Role, email: string, passkey?: string) => void;
 }
 
 type Role = 'Manufacturer' | 'Distributor' | 'Retailer' | 'Customer' | 'Admin' | null;
@@ -17,12 +18,13 @@ const roles = [
     { id: 'Manufacturer', icon: Factory, color: 'text-cyan-400', shadow: 'hover:shadow-[0_0_30px_rgba(34,211,238,0.4)]', bg: 'bg-cyan-400/10' },
     { id: 'Distributor', icon: Truck, color: 'text-purple-400', shadow: 'hover:shadow-[0_0_30px_rgba(192,132,252,0.4)]', bg: 'bg-purple-400/10' },
     { id: 'Retailer', icon: Store, color: 'text-blue-400', shadow: 'hover:shadow-[0_0_30px_rgba(96,165,250,0.4)]', bg: 'bg-blue-400/10' },
+    { id: 'Customer', icon: UserIcon, color: 'text-emerald-400', shadow: 'hover:shadow-[0_0_30px_rgba(52,211,153,0.4)]', bg: 'bg-emerald-400/10' },
     { id: 'Admin', icon: ShieldCheck, color: 'text-red-400', shadow: 'hover:shadow-[0_0_30px_rgba(248,113,113,0.4)]', bg: 'bg-red-400/10' },
 ];
 
-const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, onLogin }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, initialRole, onLogin }) => {
     const [currentMode, setCurrentMode] = useState<'login' | 'register' | 'forgot'>(initialMode);
-    const [selectedRole, setSelectedRole] = useState<Role>(null);
+    const [selectedRole, setSelectedRole] = useState<Role>(initialRole || null);
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
     const [name, setName] = useState('');
@@ -37,7 +39,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, onL
     useEffect(() => {
         if (isOpen) {
             setCurrentMode(initialMode);
-            setSelectedRole(null);
+            setSelectedRole(initialRole || null);
             setName('');
             setEmail('');
             setPasskey('');
@@ -91,7 +93,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, onL
                     animate={{ scale: 1, y: 0 }}
                     exit={{ scale: 0.9, y: 20 }}
                     transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                    className="relative w-full max-w-5xl aspect-auto md:aspect-[16/9] min-h-[600px] bg-black/40 border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col items-center justify-center"
+                    className="relative w-full max-w-6xl min-h-[600px] max-h-[95vh] bg-black/40 border border-white/10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col items-center justify-center"
                     style={{ perspective: 1200 }}
                 >
                     {/* Decorative Corner Borders */}
@@ -117,39 +119,40 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, onL
                                 animate={{ opacity: 1, rotateY: 0, scale: 1 }}
                                 exit={{ opacity: 0, rotateY: 90, scale: 0.8 }}
                                 transition={{ duration: 0.5, type: 'spring', bounce: 0.3 }}
-                                className="w-full h-full flex flex-col items-center justify-center p-8 z-10"
+                                className="w-full h-full flex flex-col items-center justify-start p-8 md:p-12 z-10 overflow-y-auto custom-scrollbar"
                             >
-                                <div className="text-center mb-12">
-                                    <motion.div
-                                        initial={{ y: -20, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.2 }}
-                                        className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/30 text-primary text-sm font-semibold mb-6 tracking-wide"
-                                    >
-                                        <ShieldCheck className="w-4 h-4" />
-                                        SECURE MEDCHAIN NETWORK
-                                    </motion.div>
-                                    <motion.h2
-                                        initial={{ y: -20, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.3 }}
-                                        className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight"
-                                    >
-                                        Select Your Node Role
-                                    </motion.h2>
-                                    <motion.p
-                                        initial={{ y: -20, opacity: 0 }}
-                                        animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.4 }}
-                                        className="text-white/60 text-lg md:text-xl max-w-2xl mx-auto"
-                                    >
-                                        Join the decentralized healthcare supply chain. Choose your participant type to {currentMode === 'login' ? 'access your dashboard.' : currentMode === 'forgot' ? 'recover your passkey.' : 'create an identity.'}
-                                    </motion.p>
-                                </div>
+                                <div className="my-auto w-full flex flex-col items-center">
+                                    <div className="text-center mb-10 w-full">
+                                        <motion.div
+                                            initial={{ y: -20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            transition={{ delay: 0.2 }}
+                                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/30 text-primary text-sm font-semibold mb-6 tracking-wide"
+                                        >
+                                            <ShieldCheck className="w-4 h-4" />
+                                            SECURE MEDCHAIN NETWORK
+                                        </motion.div>
+                                        <motion.h2
+                                            initial={{ y: -20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            transition={{ delay: 0.3 }}
+                                            className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight"
+                                        >
+                                            Select Your Node Role
+                                        </motion.h2>
+                                        <motion.p
+                                            initial={{ y: -20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            transition={{ delay: 0.4 }}
+                                            className="text-white/60 text-lg md:text-xl max-w-2xl mx-auto"
+                                        >
+                                            Join the decentralized healthcare supply chain. Choose your participant type to {currentMode === 'login' ? 'access your dashboard.' : currentMode === 'forgot' ? 'recover your passkey.' : 'create an identity.'}
+                                        </motion.p>
+                                    </div>
 
-                                {/* Role Cards Grid */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
-                                    {roles.map((role, idx) => {
+                                    {/* Role Cards Grid */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-5 w-full max-w-[1200px]">
+                                    {roles.filter(r => r.id !== 'Admin').map((role, idx) => {
                                         const Icon = role.icon;
                                         return (
                                             <motion.button
@@ -195,6 +198,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, onL
                                         {currentMode === 'login' ? 'Register here' : 'Login here'}
                                     </button>
                                 </motion.div>
+                                </div>
                             </motion.div>
                         ) : (
                             <motion.div
@@ -407,13 +411,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, onL
                                                     setError("Please fill in all required fields.");
                                                     return;
                                                 }
+
+                                                const orgName = selectedRole === 'Manufacturer' ? kycData.companyName : selectedRole === 'Distributor' ? kycData.distributorCompanyName : selectedRole === 'Retailer' ? kycData.pharmacyName : name;
+
                                                 if (currentMode === 'register') {
                                                     if (selectedRole === 'Admin') {
                                                         setError("Self-registration is not allowed for Admin. Please contact system administrators.");
                                                         return;
                                                     }
                                                     
-                                                    const orgName = selectedRole === 'Manufacturer' ? kycData.companyName : selectedRole === 'Distributor' ? kycData.distributorCompanyName : selectedRole === 'Retailer' ? kycData.pharmacyName : name;
                                                     if (!orgName) {
                                                         setError("Please provide your Organization / Company Name.");
                                                         return;
@@ -467,21 +473,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, onL
                                                     }
 
                                                     // Generate Request ID
-                                                    let prefix = '';
+                                                    let prefix = 'REQ-USR-';
                                                     if (selectedRole === 'Manufacturer') prefix = 'REQ-MFR-';
                                                     if (selectedRole === 'Distributor') prefix = 'REQ-DIST-';
                                                     if (selectedRole === 'Retailer') prefix = 'REQ-RET-';
+                                                    if (selectedRole === 'Customer') prefix = 'USR-CUST-';
                                                     const randomNum = Math.floor(1000 + Math.random() * 9000);
                                                     const reqId = `${prefix}${randomNum}`;
+
+                                                    const isCustomer = selectedRole === 'Customer';
 
                                                     const { error: insertError } = await supabase
                                                         .from('users')
                                                         .insert([{ 
                                                             role: selectedRole, 
-                                                            name: selectedRole === 'Manufacturer' ? kycData.companyName : selectedRole === 'Distributor' ? kycData.distributorCompanyName : kycData.pharmacyName, 
+                                                            name: orgName,
                                                             email, 
                                                             passkey,
-                                                            status: 'Pending',
+                                                            status: isCustomer ? 'Approved' : 'Pending',
                                                             request_id: reqId,
                                                             kyc_data: kycData
                                                         }]);
@@ -494,6 +503,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, onL
                                                             setError(`Registration failed: ${insertError.message || 'Please try again.'}`);
                                                         }
                                                         setLoading(false);
+                                                        return;
+                                                    }
+
+                                                    if (isCustomer) {
+                                                        // Automatically log them in to skip KYC
+                                                        if (onLogin) onLogin(selectedRole, email, passkey);
+                                                        onClose();
                                                         return;
                                                     }
 
@@ -531,7 +547,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, onL
                                                         }
 
                                                         // Login successful
-                                                        if (onLogin) onLogin(selectedRole, email);
+                                                        if (onLogin) onLogin(selectedRole, email, passkey);
                                                         onClose();
                                                     } else {
                                                         setError("details are invalid");

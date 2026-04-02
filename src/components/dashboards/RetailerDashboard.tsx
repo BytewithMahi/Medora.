@@ -8,9 +8,10 @@ import QRScanner from '../QRScanner';
 
 interface RetailerDashboardProps {
     onScanVerify?: (batch: string, token: string) => void;
+    userEmail?: string;
 }
 
-export default function RetailerDashboard({ onScanVerify }: RetailerDashboardProps) {
+export default function RetailerDashboard({ userEmail }: RetailerDashboardProps) {
     const [scanResult, setScanResult] = useState('');
     const [stockAmount, setStockAmount] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
@@ -19,14 +20,14 @@ export default function RetailerDashboard({ onScanVerify }: RetailerDashboardPro
     const [isScanning, setIsScanning] = useState(false);
 
     const [questions, setQuestions] = useState({
-        batchCorrect: false,
-        expiryMatching: false,
-        compositionCorrect: false
+        batchCorrect: '',
+        expiryMatching: '',
+        compositionCorrect: ''
     });
 
     const handleVerify = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!scanResult || !stockAmount || !questions.batchCorrect || !questions.expiryMatching || !questions.compositionCorrect) return;
+        if (!scanResult || !stockAmount) return;
 
         setIsVerifying(true);
         // Simulate expiring soon warning for a specific dummy batch
@@ -34,7 +35,7 @@ export default function RetailerDashboard({ onScanVerify }: RetailerDashboardPro
 
         try {
             // Find medicine
-            const { data: medicine, error: findError } = await supabase
+            const { error: findError } = await supabase
                 .from('medicines')
                 .select('id')
                 .eq('batch_no', scanResult)
@@ -42,27 +43,31 @@ export default function RetailerDashboard({ onScanVerify }: RetailerDashboardPro
 
             if (findError) throw new Error('Batch not found');
 
-            // Insert ledger event
-            const { error: eventError } = await supabase
-                .from('ledger_events')
-                .insert([{
-                    medicine_id: medicine.id,
-                    role: 'Retailer Verification',
-                    status: 'verified',
-                    details: {
-                        'Expiry Match': questions.expiryMatching ? 'True' : 'False',
-                        'ID Match': questions.batchCorrect ? 'True' : 'False',
-                        'Product Sealed': questions.compositionCorrect ? 'True' : 'False',
-                        'Stock Received': stockAmount
-                    },
-                    actor_email: 'rx@citypharmacy.local',
-                    actor_phone: '+1-555-4429'
-                }]);
+            const payload = {
+                batchId: scanResult,
+                role: 'Retailer Verification',
+                answers: {
+                    'Expiry Match': questions.expiryMatching === 'yes' ? 'True' : (questions.expiryMatching === 'no' ? 'False' : 'N/A'),
+                    'ID Match': questions.batchCorrect === 'yes' ? 'True' : (questions.batchCorrect === 'no' ? 'False' : 'N/A'),
+                    'Product Sealed': questions.compositionCorrect === 'yes' ? 'True' : (questions.compositionCorrect === 'no' ? 'False' : 'N/A'),
+                    'Stock Received': stockAmount
+                },
+                location: { latitude: 40.71, longitude: -74.00 }, // Mock
+                actorEmail: userEmail || 'rx@citypharmacy.local',
+                actorPhone: '+1-555-4429'
+            };
 
-            if (eventError) throw eventError;
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const response = await fetch(`${API_URL}/api/verify-action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-            // Update medicine status
-            await supabase.from('medicines').update({ status: 'in_stock' }).eq('id', medicine.id);
+            const result = await response.json();
+
+            if (!result.success) throw new Error(result.error || 'Verification failed');
+
 
             setIsVerified(true);
             if (willWarn) setShowWarning(true);
@@ -74,7 +79,7 @@ export default function RetailerDashboard({ onScanVerify }: RetailerDashboardPro
         }
     };
 
-    const allQuestionsChecked = questions.batchCorrect && questions.expiryMatching && questions.compositionCorrect;
+    const isFormValid = scanResult && stockAmount;
 
     return (
         <div className="relative w-full min-h-screen bg-background text-foreground overflow-hidden pt-24 pb-12 px-4 sm:px-6 lg:px-8">
@@ -184,26 +189,40 @@ export default function RetailerDashboard({ onScanVerify }: RetailerDashboardPro
                                     { id: 'expiryMatching', label: 'Is the expiry date legible and un-tampered?' },
                                     { id: 'compositionCorrect', label: 'Are the package seals 100% intact?' }
                                 ].map((q) => (
-                                    <label key={q.id} className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all ${questions[q.id as keyof typeof questions] ? 'bg-blue-500/10 border-blue-500/50' : 'bg-black/30 border-white/5 hover:border-white/20'}`}>
-                                        <div className="mt-0.5">
-                                            <input
-                                                type="checkbox"
-                                                checked={questions[q.id as keyof typeof questions]}
-                                                onChange={(e) => setQuestions({ ...questions, [q.id]: e.target.checked })}
-                                                className="w-5 h-5 rounded border-white/20 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-black/50"
-                                            />
-                                        </div>
+                                    <div key={q.id} className={`flex flex-col gap-3 p-4 rounded-xl border transition-all ${questions[q.id as keyof typeof questions] ? 'bg-blue-500/10 border-blue-500/50' : 'bg-black/30 border-white/5'}`}>
                                         <span className={`text-sm ${questions[q.id as keyof typeof questions] ? 'text-white' : 'text-white/70'}`}>{q.label}</span>
-                                    </label>
+                                        <div className="flex gap-4">
+                                            <label className="flex items-center gap-2 cursor-pointer text-sm text-white/80 hover:text-white">
+                                                <input
+                                                    type="radio"
+                                                    name={q.id}
+                                                    value="yes"
+                                                    checked={questions[q.id as keyof typeof questions] === 'yes'}
+                                                    onChange={(e) => setQuestions({ ...questions, [q.id]: e.target.value })}
+                                                    className="w-4 h-4 text-blue-500 bg-black/50 border-white/20 focus:ring-blue-500 focus:ring-offset-0"
+                                                /> Yes
+                                            </label>
+                                            <label className="flex items-center gap-2 cursor-pointer text-sm text-white/80 hover:text-white">
+                                                <input
+                                                    type="radio"
+                                                    name={q.id}
+                                                    value="no"
+                                                    checked={questions[q.id as keyof typeof questions] === 'no'}
+                                                    onChange={(e) => setQuestions({ ...questions, [q.id]: e.target.value })}
+                                                    className="w-4 h-4 text-blue-500 bg-black/50 border-white/20 focus:ring-blue-500 focus:ring-offset-0"
+                                                /> No
+                                            </label>
+                                        </div>
+                                    </div>
                                 ))}
                             </div>
 
                             <motion.button
-                                whileHover={allQuestionsChecked && scanResult && stockAmount ? { scale: 1.02 } : {}}
-                                whileTap={allQuestionsChecked && scanResult && stockAmount ? { scale: 0.98 } : {}}
-                                disabled={!allQuestionsChecked || !scanResult || !stockAmount || isVerified || isVerifying}
+                                whileHover={isFormValid ? { scale: 1.02 } : {}}
+                                whileTap={isFormValid ? { scale: 0.98 } : {}}
+                                disabled={!isFormValid || isVerified || isVerifying}
                                 type="submit"
-                                className={`w-full relative overflow-hidden rounded-xl font-bold py-4 mt-8 transition-all ${isVerified ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : (allQuestionsChecked && scanResult && stockAmount ? 'bg-blue-500 text-white hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]' : 'bg-white/5 text-white/30 cursor-not-allowed')}`}
+                                className={`w-full relative overflow-hidden rounded-xl font-bold py-4 mt-8 transition-all ${isVerified ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : (isFormValid ? 'bg-blue-500 text-white hover:shadow-[0_0_30px_rgba(59,130,246,0.5)]' : 'bg-white/5 text-white/30 cursor-not-allowed')}`}
                             >
                                 {isVerifying ? (
                                     <span className="flex items-center justify-center gap-2">
@@ -250,7 +269,7 @@ export default function RetailerDashboard({ onScanVerify }: RetailerDashboardPro
                             )}
 
                             {/* Removed hardcoded Mock DB data, just show verified or empty state for now */}
-                            {allQuestionsChecked && !isVerified && (
+                            {isFormValid && !isVerified && (
                                 <div className="col-span-1 sm:col-span-2 p-6 text-center text-white/40 border border-white/5 bg-black/20 rounded-2xl">
                                     No active verified stock fetched from block yet.
                                 </div>
@@ -279,9 +298,9 @@ export default function RetailerDashboard({ onScanVerify }: RetailerDashboardPro
                                     setScanResult(batch);
                                     setIsVerified(false);
                                     setQuestions({
-                                        batchCorrect: false,
-                                        expiryMatching: false,
-                                        compositionCorrect: false
+                                        batchCorrect: '',
+                                        expiryMatching: '',
+                                        compositionCorrect: ''
                                     });
                                 } else {
                                     alert('Invalid QR formulation. No batch found.');
