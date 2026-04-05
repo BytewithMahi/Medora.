@@ -7,6 +7,7 @@ import AboutUs from './components/AboutUs';
 import SupplyChainFlow from './components/SupplyChainFlow';
 import Features from './components/Features';
 import MedicineProof from './components/MedicineProof';
+import AIDemandInsights from './components/AIDemandInsights';
 import AuthModal from './components/AuthModal';
 import ManufacturerDashboard from './components/dashboards/ManufacturerDashboard';
 import DistributorDashboard from './components/dashboards/DistributorDashboard';
@@ -156,6 +157,9 @@ function App() {
           </div>
           <div className="snap-start min-h-screen flex items-center">
             <MedicineProof />
+          </div>
+          <div className="snap-start min-h-[60vh] flex items-center justify-center shrink-0 w-full">
+            <AIDemandInsights />
           </div>
         </div>
       ) : (

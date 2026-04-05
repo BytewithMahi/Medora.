@@ -85,6 +85,36 @@ export default function MedicineProof() {
         </p>
       </div>
 
+      {/* --- SUSPICIOUS BATCH ALERT START --- */}
+      {medicineData && medicineData.flagged_reasons && typeof medicineData.flagged_reasons === 'string' && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full mb-12 p-6 rounded-3xl border border-rose-500/30 bg-rose-500/5 backdrop-blur-xl flex flex-col md:flex-row items-center gap-6 shadow-[0_0_50px_rgba(244,63,94,0.15)]"
+        >
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/20 flex items-center justify-center shrink-0 border border-rose-500/40">
+            <ShieldAlert className="w-10 h-10 text-rose-500 animate-pulse" />
+          </div>
+          <div className="flex-1 text-center md:text-left">
+            <h3 className="text-xl font-black text-rose-500 uppercase tracking-tighter mb-1">Security Flag Alert</h3>
+            <p className="text-white/80 font-medium mb-3">This batch has been flagged as suspicious by the MedChain network due to multiple security protocol violations.</p>
+            <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+              {medicineData.flagged_reasons.split(' | ').filter(Boolean).slice(0, 1).map((reason: string, i: number) => (
+                <span key={i} className="px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold font-mono">
+                  {reason}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="shrink-0">
+             <div className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-white/40 text-[10px] font-mono uppercase text-center">
+                Ref ID: {String(medicineData.id || '').slice(0,8)}...
+             </div>
+          </div>
+        </motion.div>
+      )}
+      {/* --- SUSPICIOUS BATCH ALERT END --- */}
+
       <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
 
         {/* LEFT COLUMN: Timeline of Trust (lg: 7 cols) */}

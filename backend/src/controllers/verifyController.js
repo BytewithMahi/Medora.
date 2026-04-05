@@ -12,6 +12,7 @@ const verifyBatch = async (req, res) => {
       .from('medicines')
       .select('*')
       .eq('batch_no', batchId)
+      .limit(1)
       .single();
 
     if (batchError || !batchData) {
@@ -104,6 +105,7 @@ const verifyAction = async (req, res) => {
       .from('medicines')
       .select('*')
       .eq('batch_no', batchId)
+      .limit(1)
       .single();
 
     if (batchError || !batchData) {
@@ -135,6 +137,10 @@ const verifyAction = async (req, res) => {
       await supabase.from('medicines').update({ status: nextStatus }).eq('id', batchData.id);
     }
 
+    // --- BATCH FLAGGING SYSTEM START ---
+    await checkBatchFlags(batchData.id);
+    // --- BATCH FLAGGING SYSTEM END ---
+
     return res.json({
       success: true,
       data: { status: 'success' }
@@ -143,6 +149,105 @@ const verifyAction = async (req, res) => {
   } catch (error) {
     console.error("verifyAction error:", error);
     res.status(500).json({ success: false, error: 'Verification action failed' });
+  }
+};
+
+const checkBatchFlags = async (medicineId) => {
+  try {
+    // 1. Fetch all events for the medicine
+    const { data: events, error } = await supabase
+      .from('ledger_events')
+      .select('*')
+      .eq('medicine_id', medicineId)
+      .order('created_at', { ascending: true });
+
+    if (error || !events || events.length === 0) return;
+
+    const reasons = [];
+
+    // Identify key nodes
+    const mfgNode = events.find(e => e.role === 'Producer Initialization');
+    const distNode = events.find(e => e.role === 'Distributor Verification');
+    const retailNode = events.find(e => e.role === 'Retailer Verification');
+    const consumerNode = events.find(e => e.role === 'Consumer Scan');
+
+    // 1. Sequential Order Check
+    if (retailNode) {
+      if (!distNode) {
+        reasons.push("Sequential anomaly: Retailer verified before Distributor.");
+      } else if (new Date(distNode.created_at) > new Date(retailNode.created_at)) {
+        reasons.push("Sequential anomaly: Retailer verified before Distributor.");
+      }
+    }
+
+    if (consumerNode) {
+      if (!retailNode) {
+        reasons.push("Sequential anomaly: Consumer scanned before Retailer.");
+      } else if (new Date(retailNode.created_at) > new Date(consumerNode.created_at)) {
+        reasons.push("Sequential anomaly: Consumer scanned before Retailer.");
+      }
+      
+      if (!distNode) {
+         reasons.push("Sequential anomaly: Consumer scanned before Distributor.");
+      } else if (new Date(distNode.created_at) > new Date(consumerNode.created_at)) {
+         reasons.push("Sequential anomaly: Consumer scanned before Distributor.");
+      }
+    }
+
+    // 2. Time Gap Check (Gap < 12 hours between consecutive events)
+    for (let i = 0; i < events.length - 1; i++) {
+        const current = new Date(events[i].created_at).getTime();
+        const next = new Date(events[i+1].created_at).getTime();
+        const gapHours = (next - current) / (1000 * 60 * 60);
+        
+        if (gapHours < 12) {
+          reasons.push(`Suspiciously rapid node transition between ${events[i].role} and ${events[i+1].role} (< 12 hours).`);
+        }
+    }
+
+    // 3. Location Match Check (Distributor & Retailer)
+    if (distNode && retailNode && distNode.location && retailNode.location) {
+      const dLoc = distNode.location;
+      const rLoc = retailNode.location;
+      
+      if (dLoc.latitude === rLoc.latitude && dLoc.longitude === rLoc.longitude) {
+        reasons.push("Geographic anomaly: Distributor and Retailer locations are identical.");
+      }
+    }
+
+    // 4. Integrity Questionnaire Check
+    events.forEach(evt => {
+      const details = evt.details || {};
+      const questions = ['batchMatch', 'expiryMatch', 'compositionMatch'];
+      
+      let isAnyNo = false;
+      let isIncomplete = false;
+
+      // Special case for Producer Initialization which uses different keys
+      if (evt.role !== 'Producer Initialization') {
+        questions.forEach(q => {
+          if (details[q] === 'No') isAnyNo = true;
+          if (details[q] === null || details[q] === undefined) isIncomplete = true;
+        });
+
+        if (isAnyNo) {
+          reasons.push(`Integrity failure: "No" recorded at ${evt.role}.`);
+        }
+        if (isIncomplete) {
+          reasons.push(`Integrity warning: Checklist incomplete at ${evt.role}.`);
+        }
+      }
+    });
+
+    // Update medicine record with flags
+    const uniqueReasons = reasons.length > 0 ? [...new Set(reasons)].join(' | ') : null;
+    await supabase
+      .from('medicines')
+      .update({ flagged_reasons: uniqueReasons })
+      .eq('id', medicineId);
+
+  } catch (err) {
+    console.error("checkBatchFlags internal error:", err);
   }
 };
 

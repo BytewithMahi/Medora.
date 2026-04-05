@@ -99,6 +99,19 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
     };
 
     const getStatusConfig = () => {
+        // PRIORITY: If flagged_reasons exist, override with a High Alert status
+        if (medicineData && medicineData.flagged_reasons) {
+            return {
+                icon: AlertOctagon,
+                color: 'text-rose-500',
+                bg: 'bg-rose-500/10',
+                border: 'border-rose-500/50',
+                title: 'High Alert: Suspicious Batch Detected',
+                desc: 'This product has been flagged due to security protocol violations. It may be counterfeit or compromised.',
+                glow: 'shadow-[0_0_30px_rgba(244,63,94,0.4)]'
+            };
+        }
+
         switch (resultStatus) {
             case 'verified':
                 return {
@@ -116,8 +129,8 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
                     color: 'text-rose-500',
                     bg: 'bg-rose-500/10',
                     border: 'border-rose-500/50',
-                    title: 'Verification Failed – Possible counterfeit product',
-                    desc: 'This batch number does not exist on the MedChain ledger or has been flagged as compromised.',
+                    title: 'Verification Failed – Unauthorized Record',
+                    desc: 'This batch number does not exist on the MedChain ledger or is completely unrecognized.',
                     glow: 'shadow-[0_0_30px_rgba(244,63,94,0.3)]'
                 };
             case 'pending':
@@ -271,8 +284,34 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ type: "spring", stiffness: 200, damping: 20 }}
-                            className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-6"
+                            className="w-full max-w-4xl"
                         >
+                            {/* --- SUSPICIOUS BATCH ALERT START --- */}
+                            {medicineData && medicineData.flagged_reasons && typeof medicineData.flagged_reasons === 'string' && (
+                                <motion.div 
+                                    initial={{ opacity: 0, y: -20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="w-full mb-6 p-6 rounded-3xl border border-rose-500/30 bg-rose-500/5 backdrop-blur-xl flex flex-col md:flex-row items-center gap-6 shadow-[0_0_50px_rgba(244,63,94,0.15)]"
+                                >
+                                    <div className="w-16 h-16 rounded-2xl bg-rose-500/20 flex items-center justify-center shrink-0 border border-rose-500/40">
+                                        <ShieldAlert className="w-10 h-10 text-rose-500 animate-pulse" />
+                                    </div>
+                                    <div className="flex-1 text-center md:text-left">
+                                        <h3 className="text-xl font-black text-rose-500 uppercase tracking-tighter mb-1">Security Flag Alert</h3>
+                                        <p className="text-white/80 font-medium mb-3 text-sm">This batch has been flagged as suspicious by the MedChain network due to security protocol violations.</p>
+                                        <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                                            {medicineData.flagged_reasons.split(' | ').filter(Boolean).slice(0, 1).map((reason: string, i: number) => (
+                                                <span key={i} className="px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[10px] font-bold font-mono">
+                                                    {reason}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
+                            {/* --- SUSPICIOUS BATCH ALERT END --- */}
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 w-full">
                             {/* Status Card */}
                             <div className={`glassmorphism-dark p-8 rounded-3xl border flex flex-col items-center text-center relative overflow-hidden ${statusConfig.border} ${statusConfig.glow}`}>
                                 <div className={`absolute top-0 w-full h-2 ${statusConfig.bg.split('/')[0].replace('bg-', 'bg-')}`} />
@@ -330,79 +369,89 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
                                 <h3 className="text-xl font-bold text-white mb-8 border-b border-white/10 pb-4">Immutable Journey</h3>
 
                                 <div className="relative flex-grow flex flex-col justify-between pl-8">
-                                    {/* Vertical Line */}
-                                    <div className={`absolute top-4 bottom-4 left-[1.15rem] w-0.5 ${resultStatus === 'suspicious' ? 'bg-rose-500/20' : 'bg-emerald-500/20'}`} />
+                                    {medicineData && medicineData.flagged_reasons ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-center py-12 px-4 border-2 border-dashed border-rose-500/20 rounded-2xl bg-rose-500/5">
+                                            <AlertOctagon className="w-16 h-16 text-rose-500/40 mb-4 animate-pulse" />
+                                            <h4 className="text-lg font-bold text-rose-500 mb-2">Chain Integrity Compromised</h4>
+                                            <p className="text-xs text-white/50 max-w-[200px]">The cryptographic chain for this batch has been broken or contains critical sequence violations. Journey data is hidden for safety.</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            {/* Vertical Line */}
+                                            <div className="absolute top-4 bottom-4 left-[1.15rem] w-0.5 bg-emerald-500/20" />
 
-                                    {/* Manufacturer Node */}
-                                    {(() => {
-                                        const event = ledgerEvents.find(e => e.role === 'Producer Initialization');
-                                        return (
-                                            <div className="relative pb-8">
-                                                <div className={`absolute -left-[2.1rem] w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-900 z-10 ${resultStatus === 'suspicious' ? 'bg-rose-500/20 text-rose-500' : 'bg-emerald-500 text-slate-900 shadow-[0_0_15px_rgba(52,211,153,0.5)]'}`}>
-                                                    {resultStatus === 'suspicious' ? <AlertOctagon className="w-4 h-4" /> : <Factory className="w-5 h-5" />}
-                                                </div>
-                                                <div>
-                                                    <h4 className={`text-lg font-bold ${resultStatus === 'suspicious' ? 'text-white/50' : 'text-emerald-400'}`}>Producer Check</h4>
-                                                    {event ? (
-                                                        <>
-                                                            <p className="text-sm text-white/80 mt-1">{event.actor_email || 'Producer'}</p>
-                                                            <p className="text-xs text-white/40 mt-1 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {new Date(event.created_at).toLocaleString()}</p>
-                                                        </>
-                                                    ) : (
-                                                        <p className="text-sm text-white/30 mt-1">{resultStatus === 'suspicious' ? 'Validation Failed' : 'Pending record'}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
+                                            {/* Manufacturer Node */}
+                                            {(() => {
+                                                const event = ledgerEvents.find(e => e.role === 'Producer Initialization');
+                                                return (
+                                                    <div className="relative pb-8">
+                                                        <div className={`absolute -left-[2.1rem] w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-900 z-10 ${event ? 'bg-emerald-500 text-slate-900 shadow-[0_0_15px_rgba(52,211,153,0.5)]' : 'bg-slate-800 text-slate-500'}`}>
+                                                            {event ? <Factory className="w-5 h-5" /> : <AlertOctagon className="w-4 h-4" />}
+                                                        </div>
+                                                        <div>
+                                                            <h4 className={`text-lg font-bold ${event ? 'text-emerald-400' : 'text-white/30'}`}>Producer Check</h4>
+                                                            {event ? (
+                                                                <>
+                                                                    <p className="text-sm text-white/80 mt-1">{event.actor_email || 'Producer'}</p>
+                                                                    <p className="text-xs text-white/40 mt-1 flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {new Date(event.created_at).toLocaleString()}</p>
+                                                                </>
+                                                            ) : (
+                                                                <p className="text-sm text-white/30 mt-1 text-white/50">Pending record</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
 
-                                    {/* Distributor Node */}
-                                    {(() => {
-                                        const event = ledgerEvents.find(e => e.role === 'Distributor Verification');
-                                        return (
-                                            <div className="relative pb-8">
-                                                <div className={`absolute -left-[2.1rem] w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-900 z-10 ${event ? 'bg-emerald-500 text-slate-900' : 'bg-slate-800 text-slate-500'}`}>
-                                                    <Truck className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <h4 className={`text-lg font-bold ${event ? 'text-emerald-400' : 'text-white/30'}`}>Logistics Verified</h4>
-                                                    {event ? (
-                                                        <>
-                                                            <p className="text-sm text-white/80 mt-1">{event.actor_email || 'Distributor'}</p>
-                                                            <p className="text-xs text-white/40 mt-1 flex items-center gap-1"><Activity className="w-3 h-3" /> {new Date(event.created_at).toLocaleString()}</p>
-                                                        </>
-                                                    ) : (
-                                                        <p className="text-sm text-white/30 mt-1">Pending scan</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
+                                            {/* Distributor Node */}
+                                            {(() => {
+                                                const event = ledgerEvents.find(e => e.role === 'Distributor Verification');
+                                                return (
+                                                    <div className="relative pb-8">
+                                                        <div className={`absolute -left-[2.1rem] w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-900 z-10 ${event ? 'bg-emerald-500 text-slate-900' : 'bg-slate-800 text-slate-500'}`}>
+                                                            <Truck className="w-5 h-5" />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className={`text-lg font-bold ${event ? 'text-emerald-400' : 'text-white/30'}`}>Logistics Verified</h4>
+                                                            {event ? (
+                                                                <>
+                                                                    <p className="text-sm text-white/80 mt-1">{event.actor_email || 'Distributor'}</p>
+                                                                    <p className="text-xs text-white/40 mt-1 flex items-center gap-1"><Activity className="w-3 h-3" /> {new Date(event.created_at).toLocaleString()}</p>
+                                                                </>
+                                                            ) : (
+                                                                <p className="text-sm text-white/30 mt-1">Pending scan</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
 
-                                    {/* Retailer Node */}
-                                    {(() => {
-                                        const event = ledgerEvents.find(e => e.role === 'Retailer Verification');
-                                        return (
-                                            <div className="relative">
-                                                <div className={`absolute -left-[2.1rem] w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-900 z-10 ${event ? 'bg-emerald-500 text-slate-900' : 'bg-slate-800 text-slate-500'}`}>
-                                                    <Store className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <h4 className={`text-lg font-bold ${event ? 'text-emerald-400' : 'text-white/30'}`}>Pharmacy Arrival</h4>
-                                                    {event ? (
-                                                        <>
-                                                            <p className="text-sm text-white/80 mt-1">{event.actor_email || 'Retailer'}</p>
-                                                            <p className="text-xs text-white/40 mt-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {new Date(event.created_at).toLocaleString()}</p>
-                                                        </>
-                                                    ) : (
-                                                        <p className="text-sm text-white/30 mt-1">Pending arrival</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-
+                                            {/* Retailer Node */}
+                                            {(() => {
+                                                const event = ledgerEvents.find(e => e.role === 'Retailer Verification');
+                                                return (
+                                                    <div className="relative">
+                                                        <div className={`absolute -left-[2.1rem] w-10 h-10 rounded-full flex items-center justify-center border-4 border-slate-900 z-10 ${event ? 'bg-emerald-500 text-slate-900' : 'bg-slate-800 text-slate-500'}`}>
+                                                            <Store className="w-5 h-5" />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className={`text-lg font-bold ${event ? 'text-emerald-400' : 'text-white/s30'}`}>Pharmacy Arrival</h4>
+                                                            {event ? (
+                                                                <>
+                                                                    <p className="text-sm text-white/80 mt-1">{event.actor_email || 'Retailer'}</p>
+                                                                    <p className="text-xs text-white/40 mt-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> {new Date(event.created_at).toLocaleString()}</p>
+                                                                </>
+                                                            ) : (
+                                                                <p className="text-sm text-white/30 mt-1">Pending arrival</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </>
+                                    )}
                                 </div>
+                            </div>
                             </div>
                         </motion.div>
                     )}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle, FileText, Activity } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, AlertTriangle, CheckCircle, FileText, Activity, AlertOctagon } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface VerificationPageProps {
@@ -52,6 +52,7 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
                 .from('medicines')
                 .select('*')
                 .eq('batch_no', batch)
+                .limit(1)
                 .single();
 
             if (medError || !medData) {
@@ -149,6 +150,31 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
                     </motion.div>
                 ) : medicine && (
                     <motion.div key="valid" className="w-full space-y-6">
+                        {/* --- SUSPICIOUS BATCH ALERT START --- */}
+                        {medicine && medicine.flagged_reasons && typeof medicine.flagged_reasons === 'string' && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="w-full mb-6 p-6 rounded-3xl border border-rose-500/30 bg-rose-500/5 backdrop-blur-xl flex flex-col md:flex-row items-center gap-6 shadow-[0_0_50px_rgba(244,63,94,0.15)]"
+                            >
+                                <div className="w-16 h-16 rounded-2xl bg-rose-500/20 flex items-center justify-center shrink-0 border border-rose-500/40">
+                                    <ShieldAlert className="w-10 h-10 text-rose-500 animate-pulse" />
+                                </div>
+                                <div className="flex-1 text-center md:text-left">
+                                    <h3 className="text-xl font-black text-rose-500 uppercase tracking-tighter mb-1">Security Flag Alert</h3>
+                                    <p className="text-white/80 font-medium mb-3 text-sm">This batch has been flagged as suspicious by the MedChain network due to security protocol violations.</p>
+                                    <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+                                        {medicine.flagged_reasons.split(' | ').filter(Boolean).slice(0, 1).map((reason: string, i: number) => (
+                                            <span key={i} className="px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[10px] font-bold font-mono">
+                                                {reason}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                        {/* --- SUSPICIOUS BATCH ALERT END --- */}
+
                         {/* Scan Count Warning if > 20 */}
                         {scanCount > 20 && (
                             <motion.div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-2xl flex gap-3 text-amber-200">
@@ -162,12 +188,14 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
 
                         {/* Status Guard Card */}
                         {verifiedSuccess && (
-                            <div className="glassmorphism-dark p-6 rounded-3xl border border-emerald-500/50 shadow-[0_0_30px_rgba(52,211,153,0.3)] text-center relative overflow-hidden">
-                                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <ShieldCheck className="w-8 h-8 text-emerald-400" />
+                            <div className={`glassmorphism-dark p-6 rounded-3xl border shadow-lg text-center relative overflow-hidden ${medicine.flagged_reasons ? 'border-rose-500/50 shadow-[0_0_30px_rgba(244,63,94,0.3)] bg-rose-500/5' : 'border-emerald-500/50 shadow-[0_0_30px_rgba(52,211,153,0.3)]'}`}>
+                                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${medicine.flagged_reasons ? 'bg-rose-500/10' : 'bg-emerald-500/10'}`}>
+                                    {medicine.flagged_reasons ? <AlertOctagon className="w-8 h-8 text-rose-500" /> : <ShieldCheck className="w-8 h-8 text-emerald-400" />}
                                 </div>
-                                <h2 className="text-xl font-black text-emerald-400 mb-1">Authentic Batch Confirmed</h2>
-                                <p className="text-white/60 text-xs">Token: {token} verified against MedChain Node.</p>
+                                <h2 className={`text-xl font-black mb-1 ${medicine.flagged_reasons ? 'text-rose-500' : 'text-emerald-400'}`}>
+                                    {medicine.flagged_reasons ? 'High Alert: Suspicious Batch Detected' : 'Authentic Batch Confirmed'}
+                                </h2>
+                                <p className="text-white/60 text-xs">{medicine.flagged_reasons ? 'This product has failed MedChain security protocol checks.' : `Token: ${token} verified against MedChain Node.`}</p>
                             </div>
                         )}
 
@@ -253,10 +281,24 @@ export default function VerificationPage({ batch, token, currentUserRole, curren
                         )}
 
                         {verifiedSuccess && (
-                            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-6 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl text-center">
-                                <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-2" />
-                                <h3 className="text-lg font-bold text-emerald-400">Node Synchronization Success</h3>
-                                <p className="text-xs text-white/60">Verification block added to immutable ledger.</p>
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.9 }} 
+                                animate={{ opacity: 1, scale: 1 }} 
+                                className={`p-6 rounded-2xl text-center border ${medicine.flagged_reasons ? 'bg-rose-500/10 border-rose-500/30' : 'bg-emerald-500/10 border-emerald-500/30'}`}
+                            >
+                                {medicine.flagged_reasons ? (
+                                    <>
+                                        <AlertTriangle className="w-12 h-12 text-rose-500 mx-auto mb-2" />
+                                        <h3 className="text-lg font-bold text-rose-500">Security Anomaly Detected</h3>
+                                        <p className="text-xs text-white/60">Warning: This product has been flagged as suspicious.</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-2" />
+                                        <h3 className="text-lg font-bold text-emerald-400">Node Synchronization Success</h3>
+                                        <p className="text-xs text-white/60">Verification block added to immutable ledger.</p>
+                                    </>
+                                )}
                             </motion.div>
                         )}
 

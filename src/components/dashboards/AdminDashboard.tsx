@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, XCircle, Shield, Search, Building2, FileText, User, Cpu, Activity, MapPin, BarChart3 } from 'lucide-react';
+import { CheckCircle, XCircle, Shield, Search, Building2, FileText, User, Cpu, Activity, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface KYCData {
@@ -173,15 +173,7 @@ const AdminDashboard: React.FC = () => {
             <span className="text-xs font-normal text-white/40">Compute Master Matrix</span>
           </button>
 
-          <button 
-            onClick={() => runAITest('predict-demand/MED-101', 'Demand Predictor')}
-            disabled={testingAi}
-            className="flex flex-col items-center gap-2 p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-purple-500/10 hover:border-purple-500/50 transition-all font-semibold text-white/80 shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
-          >
-            <BarChart3 className="w-8 h-8 text-purple-400 drop-shadow-[0_0_10px_rgba(192,132,252,0.8)]" />
-            <span>Demand Prediction</span>
-            <span className="text-xs font-normal text-white/40">Forecast MED-101 Needs</span>
-          </button>
+
         </div>
 
         <AnimatePresence mode="wait">

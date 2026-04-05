@@ -5,6 +5,7 @@ import { Canvas } from '@react-three/fiber';
 import { QRCodeSVG } from 'qrcode.react';
 import FloatingMedicine3D from './FloatingMedicine3D';
 import { supabase } from '../../lib/supabase';
+import SeasonalDemandFull from './SeasonalDemandFull';
 
 // Helper to generate a random 8-character hex token
 const generateToken = () => {
@@ -304,6 +305,15 @@ export default function ManufacturerDashboard({ userEmail }: { userEmail?: strin
                         </div>
                     </motion.div>
                 </div>
+                
+                {/* AI Seasonal Demand Insights Section */}
+                <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                >
+                    <SeasonalDemandFull />
+                </motion.div>
             </div>
         </div>
     );
