@@ -158,7 +158,7 @@ function App() {
           <div className="snap-start min-h-screen flex items-center">
             <MedicineProof />
           </div>
-          <div className="snap-start min-h-[60vh] flex items-center justify-center shrink-0 w-full">
+          <div className="snap-start min-h-screen flex items-center justify-center shrink-0 w-full">
             <AIDemandInsights />
           </div>
         </div>
