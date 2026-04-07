@@ -1,0 +1,19 @@
+{
+  "name": "medora-supply-chain",
+  "version": "1.0.0",
+  "description": "Smart contract for Medora medicine supply chain verification",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy": "hardhat run deploy.js --network hardhat",
+    "deploy:sepolia": "hardhat run deploy.js --network sepolia",
+    "test": "hardhat test",
+    "verify": "hardhat verify --network sepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0"
+  }
+}

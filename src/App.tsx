@@ -17,8 +17,9 @@ import AdminDashboard from './components/dashboards/AdminDashboard';
 
 import VerificationPage from './components/VerificationPage';
 import MedoraChat from './components/MedoraChat';
+import BlockPage from './components/BlockPage';
 
-type Role = 'Manufacturer' | 'Distributor' | 'Retailer' | 'Customer' | 'Admin' | 'Verify' | null;
+type Role = 'Manufacturer' | 'Distributor' | 'Retailer' | 'Customer' | 'Admin' | 'Verify' | 'Block' | null;
 
 function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -51,6 +52,10 @@ function App() {
       setTimeout(() => {
         setIsAuthModalOpen(true);
       }, 500);
+    }
+
+    if (pathname === '/medora/block' || pathname === '/block') {
+      setActiveRole('Block');
     }
   }, []);
 
@@ -209,6 +214,11 @@ function App() {
                 {activeRole === 'Admin' && (
                   <motion.div key="admin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     <AdminDashboard />
+                  </motion.div>
+                )}
+                {activeRole === 'Block' && (
+                  <motion.div key="block" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <BlockPage />
                   </motion.div>
                 )}
               </>
