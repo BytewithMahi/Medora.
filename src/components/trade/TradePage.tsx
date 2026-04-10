@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
@@ -21,6 +21,7 @@ import TradeMarketplace from './internal/TradeMarketplace';
 import AssetDetail from './internal/AssetDetail';
 import TradeNavbar from './elements/TradeNavbar';
 import { useWeb3 } from '../../context/Web3Context';
+import { ethers } from 'ethers';
 
 // --- Components ---
 
@@ -167,13 +168,70 @@ const FeaturesSection = () => {
   );
 };
 
-const MarketplaceSection = ({ onSelect }: { onSelect: () => void }) => {
-  const tokens = [
-    { name: "Medora Labs", symbol: "MLAB", price: "$12.45", change: "+5.2%", color: "text-primary" },
-    { name: "Trust Pharma", symbol: "TRST", price: "$1,204.00", change: "-1.8%", color: "text-red-500" },
-    { name: "SupplyCore", symbol: "SULT", price: "$89.12", change: "+12.4%", color: "text-emerald-500" },
-    { name: "BioGen", symbol: "BGN", price: "$2.34", change: "+0.2%", color: "text-blue-500" }
+const MarketplaceSection = ({ onSelect }: { onSelect: (asset?: any) => void }) => {
+  const { contracts, isConnected } = useWeb3();
+  const [tokens, setTokens] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const mockTokens = [
+    { name: "Medora Labs", symbol: "MLAB", price: "0.0012", change: "+5.2%", color: "text-primary" },
+    { name: "Trust Pharma", symbol: "TRST", price: "0.0450", change: "-1.8%", color: "text-red-500" },
+    { name: "SupplyCore", symbol: "SULT", price: "0.0089", change: "+12.4%", color: "text-emerald-500" },
+    { name: "BioGen", symbol: "BGN", price: "0.0002", change: "+0.2%", color: "text-blue-500" }
   ];
+
+  useEffect(() => {
+    const fetchLandingTokens = async () => {
+      if (!contracts.registry || !contracts.marketplace) {
+        setTokens(mockTokens);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const manufacturers = await contracts.registry.getAllManufacturers();
+        const fetched: any[] = [];
+
+        // Fetch top 4 tokens
+        for (const mAddr of manufacturers.slice(0, 4)) {
+          const tAddr = await contracts.registry.getManufacturerToken(mAddr);
+          if (tAddr === ethers.ZeroAddress) continue;
+
+          const metadata = await contracts.registry.getTokenMetadata(tAddr);
+          const poolState = await contracts.marketplace.getPoolState(tAddr);
+
+          fetched.push({
+            address: tAddr,
+            name: metadata.name,
+            symbol: metadata.symbol,
+            price: ethers.formatEther(poolState.lastPrice),
+            change: "+0.0%",
+            color: "text-primary",
+            isLive: true
+          });
+        }
+
+        if (fetched.length > 0) {
+          setTokens(fetched);
+        } else {
+          setTokens(mockTokens);
+        }
+      } catch (error) {
+        console.error("Error fetching landing tokens:", error);
+        setTokens(mockTokens);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isConnected) {
+      fetchLandingTokens();
+    } else {
+      setTokens(mockTokens);
+      setIsLoading(false);
+    }
+  }, [contracts, isConnected]);
 
   return (
     <section className="py-24 bg-primary/5 backdrop-blur-3xl border-y border-white/5">
@@ -181,19 +239,26 @@ const MarketplaceSection = ({ onSelect }: { onSelect: () => void }) => {
         <SectionTitle title="Active Marketplace" subtitle="Real-time tokenized assets directly from the Medora supply chain ecosystem." />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {tokens.map((t, i) => (
-            <GlassCard key={i} onClick={onSelect}>
+            <GlassCard key={i} onClick={() => onSelect(t.isLive ? t : null)}>
               <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
-                   <span className="text-xs font-bold text-primary">{t.symbol}</span>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center border border-white/10">
+                    <span className="text-xs font-bold text-primary">{t.symbol[0]}</span>
+                  </div>
+                  {t.isLive && (
+                    <div className="px-2 py-0.5 rounded-full bg-primary/20 border border-primary/30 text-[8px] font-black uppercase text-primary animate-pulse">
+                      Live
+                    </div>
+                  )}
                 </div>
-                <div className={`px-2 py-1 rounded-lg bg-white/5 text-xs font-bold ${t.color}`}>
+                <div className={`px-2 py-1 rounded-lg bg-white/5 text-xs font-bold ${t.color || 'text-primary'}`}>
                   {t.change}
                 </div>
               </div>
               <h4 className="text-white font-bold text-lg mb-1">{t.name}</h4>
-              <p className="text-3xl font-black mb-6">{t.price}</p>
+              <p className="text-3xl font-black mb-6">{Number(t.price).toFixed(4)} <span className="text-sm text-gray-500">ETH</span></p>
               <button className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-white/80 transition-all flex items-center justify-center gap-2">
-                Trade Asset <ArrowUpRight className="w-4 h-4" />
+                {t.isLive ? 'Trade Asset' : 'View Detail'} <ArrowUpRight className="w-4 h-4" />
               </button>
             </GlassCard>
           ))}
@@ -250,13 +315,20 @@ const InvestmentSection = () => {
     );
 }
 
-const TradePage = () => {
+interface TradePageProps {
+  userEmail?: string;
+  userRole?: string | null;
+}
+
+const TradePage = ({ userEmail, userRole }: TradePageProps) => {
   const [activeView, setActiveView] = useState<'landing' | 'dashboard' | 'marketplace' | 'detail' | 'analytics'>('landing');
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
 
   const handleSelectAsset = (asset: any) => {
-    setSelectedAsset(asset);
-    setActiveView('detail');
+    if (asset) {
+      setSelectedAsset(asset);
+      setActiveView('detail');
+    }
   };
   return (
     <div className="min-h-screen bg-[#020617] text-white selection:bg-primary/50 relative overflow-x-hidden pt-16">
@@ -289,7 +361,7 @@ const TradePage = () => {
           )}
           {activeView === 'marketplace' && (
             <motion.div key="marketplace" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="pt-10">
-              <TradeMarketplace onSelect={handleSelectAsset} />
+              <TradeMarketplace onSelect={handleSelectAsset} userRole={userRole} />
             </motion.div>
           )}
           {activeView === 'detail' && (

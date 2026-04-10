@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Clock, Info, ShieldCheck, Zap, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Clock, Info, ShieldCheck, Zap, Loader2, AlertTriangle, CheckCircle2, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWeb3 } from '../../../context/Web3Context';
 import { ethers } from 'ethers';

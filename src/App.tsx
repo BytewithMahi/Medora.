@@ -27,6 +27,7 @@ function App() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authInitialRole, setAuthInitialRole] = useState<Role>(null);
   const [activeRole, setActiveRole] = useState<Role>(null);
+  const [userRole, setUserRole] = useState<Role>(null);
 
   const [verifyParams, setVerifyParams] = useState<{ batch: string; token: string } | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
@@ -238,7 +239,7 @@ function App() {
                 )}
                 {activeRole === 'Trade' && (
                   <motion.div key="trade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <TradePage />
+                    <TradePage userEmail={userEmail} userRole={userRole} />
                   </motion.div>
                 )}
               </>
@@ -254,6 +255,7 @@ function App() {
         initialRole={authInitialRole as any}
         onLogin={(role: any, email, passkey) => {
           setActiveRole(role);
+          setUserRole(role);
           setUserEmail(email);
           setUserPasskey(passkey || ''); // Save for crypto lookup
         }}

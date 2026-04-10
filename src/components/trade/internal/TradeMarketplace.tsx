@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, ChevronRight, Loader2, TrendingUp } from 'lucide-react';
+import { Search, Filter, ChevronRight, Loader2, TrendingUp, Plus } from 'lucide-react';
 import { useWeb3 } from '../../../context/Web3Context';
 import { ethers } from 'ethers';
+import CreateTokenModal from './CreateTokenModal';
 
 interface MarketToken {
   address: string;
@@ -13,53 +14,91 @@ interface MarketToken {
   change: string;
 }
 
-const TradeMarketplace = ({ onSelect }: { onSelect: (asset: any) => void }) => {
-    const { contracts, isConnected } = useWeb3();
+interface TradeMarketplaceProps {
+    onSelect: (asset: any) => void;
+    userRole?: string | null;
+}
+
+const TradeMarketplace = ({ onSelect, userRole }: TradeMarketplaceProps) => {
+    const { contracts, isConnected, account } = useWeb3();
     const [tokens, setTokens] = useState<MarketToken[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [isVerifiedOnChain, setIsVerifiedOnChain] = useState(false);
 
-    useEffect(() => {
-        const fetchTokens = async () => {
-            if (!contracts.registry || !contracts.marketplace) {
-                // If not connected, we could show mock data or empty
-                setIsLoading(false);
-                return;
+    const fetchTokens = async () => {
+        if (!contracts.registry || !contracts.marketplace) {
+            // If not connected, we could show mock data or empty
+            setIsLoading(false);
+            return;
+        }
+
+        try {
+            setIsLoading(true);
+            const manufacturers = await contracts.registry.getAllManufacturers();
+            const fetchedTokens: MarketToken[] = [];
+
+            for (const mAddr of manufacturers) {
+                const tAddr = await contracts.registry.getManufacturerToken(mAddr);
+                if (tAddr === ethers.ZeroAddress) continue;
+
+                const metadata = await contracts.registry.getTokenMetadata(tAddr);
+                const poolState = await contracts.marketplace.getPoolState(tAddr);
+
+                fetchedTokens.push({
+                    address: tAddr,
+                    name: metadata.name,
+                    symbol: metadata.symbol,
+                    price: ethers.formatEther(poolState.lastPrice),
+                    supply: ethers.formatEther(metadata.totalSupply),
+                    volume: ethers.formatEther(poolState.totalVolume),
+                    change: "+0.0%", // Change calculation would require history
+                });
             }
 
-            try {
-                setIsLoading(true);
-                const manufacturers = await contracts.registry.getAllManufacturers();
-                const fetchedTokens: MarketToken[] = [];
+            setTokens(fetchedTokens);
 
-                for (const mAddr of manufacturers) {
-                    const tAddr = await contracts.registry.getManufacturerToken(mAddr);
-                    if (tAddr === ethers.ZeroAddress) continue;
+            // Check on-chain verification
+            if (isConnected && account) {
+                const verified = await contracts.registry.isRegisteredManufacturer(account);
+                setIsVerifiedOnChain(verified);
+            }
+        } catch (error) {
+            console.error("Error fetching tokens:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-                    const metadata = await contracts.registry.getTokenMetadata(tAddr);
-                    const poolState = await contracts.marketplace.getPoolState(tAddr);
+    useEffect(() => {
+        fetchTokens();
+    }, [contracts, isConnected, account]);
 
-                    fetchedTokens.push({
-                        address: tAddr,
-                        name: metadata.name,
-                        symbol: metadata.symbol,
-                        price: ethers.formatEther(poolState.lastPrice),
-                        supply: ethers.formatEther(metadata.totalSupply),
-                        volume: ethers.formatEther(poolState.totalVolume),
-                        change: "+0.0%", // Change calculation would require history
-                    });
+    useEffect(() => {
+        let ctrlCount = 0;
+        let lastCtrlTime = 0;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Control' && e.location === 1) { // Left Control
+                const now = Date.now();
+                if (now - lastCtrlTime < 500) {
+                    ctrlCount++;
+                } else {
+                    ctrlCount = 1;
                 }
+                lastCtrlTime = now;
 
-                setTokens(fetchedTokens);
-            } catch (error) {
-                console.error("Error fetching tokens:", error);
-            } finally {
-                setIsLoading(false);
+                if (ctrlCount === 5) {
+                    setIsCreateModalOpen(true);
+                    ctrlCount = 0;
+                }
             }
         };
 
-        fetchTokens();
-    }, [contracts]);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     const filteredTokens = tokens.filter(t => 
         t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -83,6 +122,14 @@ const TradeMarketplace = ({ onSelect }: { onSelect: (asset: any) => void }) => {
                    <p className="text-gray-500 text-sm">Verified algorithmic supply-chain tokens</p>
                 </div>
                 <div className="flex gap-4 w-full md:w-auto">
+                    {(userRole === 'Manufacturer' || isVerifiedOnChain) && (
+                        <button 
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="bg-primary text-black font-black px-6 py-3 rounded-xl hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all flex items-center gap-2"
+                        >
+                            <Plus className="w-5 h-5" /> Create Token
+                        </button>
+                    )}
                     <div className="relative flex-grow md:w-80">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
                         <input 
@@ -155,6 +202,11 @@ const TradeMarketplace = ({ onSelect }: { onSelect: (asset: any) => void }) => {
                     </tbody>
                 </table>
             </div>
+            <CreateTokenModal 
+                isOpen={isCreateModalOpen} 
+                onClose={() => setIsCreateModalOpen(false)}
+                onSuccess={fetchTokens}
+            />
         </div>
     );
 };
