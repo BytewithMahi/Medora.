@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 
@@ -22,6 +22,7 @@ contract MedoraSupplyChain is AccessControl {
     error BatchNotFound(bytes32 batchId);
     error InsufficientRole(bytes32 requiredRole);
     error InvalidAddress();
+    error UnauthorizedAction(address actor, string message);
 
     // Struct to store supply chain handoff entries
     struct ChainEntry {
@@ -144,13 +145,18 @@ contract MedoraSupplyChain is AccessControl {
         batchExists(batchId)
         validAddress(toAddress)
     {
+        Batch storage batch = batches[batchId];
+        ChainEntry[] storage chain = batch.handoffChain;
+
+        // Security check: Only the current holder (last actor in chain) can transfer
+        if (msg.sender != chain[chain.length - 1].actor) {
+            revert UnauthorizedAction(msg.sender, "Caller is not the current batch holder");
+        }
+
         // Verify recipient has the required role
         if (!hasRole(role, toAddress)) {
             revert InsufficientRole(role);
         }
-
-        Batch storage batch = batches[batchId];
-        ChainEntry[] storage chain = batch.handoffChain;
         
         // Get the current holder's role (last entry in chain)
         bytes32 currentRole = chain[chain.length - 1].role;
