@@ -20,9 +20,9 @@ export default function Hero({ onCheckBatch }: HeroProps) {
           transition={{ duration: 1, delay: 0.2 }}
         >
           <h1 className="text-[5rem] sm:text-[8rem] lg:text-[10rem] font-black leading-[0.85] tracking-tighter text-glow text-white mix-blend-difference mb-8">
-            <span className="block text-primary/80">DECODE</span>
-            <span className="block text-purple-400">THE</span>
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-primary">FUTURE.</span>
+            <span className="block text-primary/80">YOUR</span>
+            <span className="block text-purple-400">MEDS,</span>
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-primary">SAFE.</span>
           </h1>
 
           <motion.p
@@ -33,7 +33,7 @@ export default function Hero({ onCheckBatch }: HeroProps) {
           >
             Pioneering the next era of immutable healthcare logistics through AI and Blockchain.
           </motion.p>
-          
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -43,11 +43,11 @@ export default function Hero({ onCheckBatch }: HeroProps) {
           >
             <motion.button
               onClick={onCheckBatch}
-              whileHover={{ 
-                scale: 1.05, 
-                rotateX: 10, 
+              whileHover={{
+                scale: 1.05,
+                rotateX: 10,
                 rotateY: -10,
-                boxShadow: "0 20px 40px rgba(6, 182, 212, 0.4)" 
+                boxShadow: "0 20px 40px rgba(6, 182, 212, 0.4)"
               }}
               whileTap={{ scale: 0.95 }}
               className="group relative flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(6,182,212,0.2)] transition-all"

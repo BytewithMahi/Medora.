@@ -57,6 +57,12 @@ function App() {
     if (pathname === '/medora/block' || pathname === '/block') {
       setActiveRole('Block');
     }
+
+    if (pathname === '/medora/admin' && !activeRole) {
+      setAuthMode('login');
+      setAuthInitialRole('Admin');
+      setIsAuthModalOpen(true);
+    }
   }, []);
 
   return (
@@ -103,13 +109,7 @@ function App() {
             </button>
           ) : !isChatView && (
             <>
-              <button
-                title="Admin Control Panel"
-                onClick={() => { setAuthMode('login'); setAuthInitialRole('Admin'); setIsAuthModalOpen(true); }}
-                className="p-2 mr-2 text-white/30 hover:text-red-400 border border-transparent hover:border-red-500/30 rounded-full transition-all hover:bg-red-500/10"
-              >
-                <ShieldCheck className="w-5 h-5" />
-              </button>
+
               <button
                 onClick={() => { setAuthMode('login'); setAuthInitialRole(null); setIsAuthModalOpen(true); }}
                 className="px-5 py-2 md:px-6 md:py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold rounded-full backdrop-blur-md transition-all hover:border-white/20 hover:scale-105"

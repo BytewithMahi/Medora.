@@ -43,3 +43,5 @@ server.listen(PORT, () => {
   console.log(`[Medora Backend] running natively on http://localhost:${PORT}`);
   console.log(`[WebSocket] E2EE chat enabled and waiting connections.`);
 });
+
+
