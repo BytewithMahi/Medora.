@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 require('dotenv').config();
 
 const apiRoutes = require('./routes/apiRoutes');
+const tradeRoutes = require('./routes/tradeRoutes');
 const { initChatSockets } = require('./sockets/chat');
 
 const app = express();
@@ -28,6 +29,7 @@ app.use(express.json());
 
 // Main App Router API
 app.use('/api', apiRoutes);
+app.use('/api/trade', tradeRoutes);
 
 // Health Endpoint
 app.get('/health', (req, res) => {

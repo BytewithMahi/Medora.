@@ -17,9 +17,10 @@ import AdminDashboard from './components/dashboards/AdminDashboard';
 
 import VerificationPage from './components/VerificationPage';
 import MedoraChat from './components/MedoraChat';
+import TradePage from './components/trade/TradePage';
 import BlockPage from './components/BlockPage';
 
-type Role = 'Manufacturer' | 'Distributor' | 'Retailer' | 'Customer' | 'Admin' | 'Verify' | 'Block' | null;
+type Role = 'Manufacturer' | 'Distributor' | 'Retailer' | 'Customer' | 'Admin' | 'Verify' | 'Block' | 'Trade' | null;
 
 function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -58,6 +59,10 @@ function App() {
       setActiveRole('Block');
     }
 
+    if (pathname === '/medora/trade') {
+      setActiveRole('Trade');
+    }
+
     if (pathname === '/medora/admin' && !activeRole) {
       setAuthMode('login');
       setAuthInitialRole('Admin');
@@ -70,63 +75,65 @@ function App() {
       {/* Only show global Scene if not in a dashboard / chat */}
       {(!activeRole && !isChatView) && <Scene />}
 
-      {/* Fixed Top Logo */}
-      <motion.header
-        initial={{ y: -50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 1, type: "spring" }}
-        className="fixed top-0 left-0 w-full p-6 z-50 flex items-center justify-between pointer-events-none"
-      >
-        <div className="flex items-center gap-3">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-            className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50 shadow-[0_0_15px_rgba(6,182,212,0.6)]"
-          >
-            <Activity className="w-5 h-5 text-primary" />
-          </motion.div>
-          <span className="text-2xl font-black tracking-widest text-white uppercase text-glow pointer-events-auto cursor-pointer" onClick={() => { setIsChatView(false); setActiveRole(null); }}>
-            Medora
-          </span>
-        </div>
-
-        <div className="flex items-center gap-4 pointer-events-auto">
-          {/* Medora* Chat Link Button */}
-          <a
-            href="?chat=true"
-            target="_blank"
-            className="px-4 py-2 bg-primary/20 border border-primary/50 hover:bg-primary/30 text-primary font-black rounded-full shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all hover:scale-105 backdrop-blur-md flex items-center gap-1 text-sm md:text-base border-glow"
-          >
-            Medora*
-          </a>
-
-          {activeRole ? (
-            <button
-              onClick={() => { setActiveRole(null); setIsChatView(false); }}
-              className="px-5 py-2 md:px-6 md:py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold rounded-full backdrop-blur-md transition-all hover:border-white/20 hover:scale-105"
+      {/* Fixed Top Logo - Hidden in Trade Mode */}
+      {activeRole !== 'Trade' && (
+        <motion.header
+          initial={{ y: -50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 1, type: "spring" }}
+          className="fixed top-0 left-0 w-full p-6 z-50 flex items-center justify-between pointer-events-none"
+        >
+          <div className="flex items-center gap-3">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+              className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/50 shadow-[0_0_15px_rgba(6,182,212,0.6)]"
             >
-              {activeRole === 'Customer' ? 'Home' : 'Log Out'}
-            </button>
-          ) : !isChatView && (
-            <>
+              <Activity className="w-5 h-5 text-primary" />
+            </motion.div>
+            <span className="text-2xl font-black tracking-widest text-white uppercase text-glow pointer-events-auto cursor-pointer" onClick={() => { setIsChatView(false); setActiveRole(null); }}>
+              Medora
+            </span>
+          </div>
 
+          <div className="flex items-center gap-4 pointer-events-auto">
+            {/* Medora* Chat Link Button */}
+            <a
+              href="?chat=true"
+              target="_blank"
+              className="px-4 py-2 bg-primary/20 border border-primary/50 hover:bg-primary/30 text-primary font-black rounded-full shadow-[0_0_10px_rgba(6,182,212,0.4)] transition-all hover:scale-105 backdrop-blur-md flex items-center gap-1 text-sm md:text-base border-glow"
+            >
+              Medora*
+            </a>
+
+            {activeRole ? (
               <button
-                onClick={() => { setAuthMode('login'); setAuthInitialRole(null); setIsAuthModalOpen(true); }}
+                onClick={() => { setActiveRole(null); setIsChatView(false); }}
                 className="px-5 py-2 md:px-6 md:py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold rounded-full backdrop-blur-md transition-all hover:border-white/20 hover:scale-105"
               >
-                Sign In
+                {activeRole === 'Customer' ? 'Home' : 'Log Out'}
               </button>
-              <button
-                onClick={() => { setAuthMode('register'); setAuthInitialRole(null); setIsAuthModalOpen(true); }}
-                className="group relative px-5 py-2 md:px-6 md:py-2.5 bg-white text-black font-bold rounded-full overflow-hidden transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]"
-              >
-                <span className="relative z-10">Register</span>
-                <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform ease-out" />
-              </button>
-            </>
-          )}
-        </div>
-      </motion.header>
+            ) : !isChatView && (
+              <>
+
+                <button
+                  onClick={() => { setAuthMode('login'); setAuthInitialRole(null); setIsAuthModalOpen(true); }}
+                  className="px-5 py-2 md:px-6 md:py-2.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold rounded-full backdrop-blur-md transition-all hover:border-white/20 hover:scale-105"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => { setAuthMode('register'); setAuthInitialRole(null); setIsAuthModalOpen(true); }}
+                  className="group relative px-5 py-2 md:px-6 md:py-2.5 bg-white text-black font-bold rounded-full overflow-hidden transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]"
+                >
+                  <span className="relative z-10">Register</span>
+                  <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform ease-out" />
+                </button>
+              </>
+            )}
+          </div>
+        </motion.header>
+      )}
 
       {/* Content wrapper */}
       {isChatView ? (
@@ -208,14 +215,14 @@ function App() {
                 )}
                 {activeRole === 'Customer' && (
                   <motion.div key="customer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <CustomerDashboard 
-                        userEmail={userEmail} 
-                        onScanVerify={(batch: string, token: string) => { setVerifyParams({ batch, token }); }} 
-                        onAuthRequired={() => {
-                            setAuthMode('register');
-                            setAuthInitialRole('Customer');
-                            setIsAuthModalOpen(true);
-                        }}
+                    <CustomerDashboard
+                      userEmail={userEmail}
+                      onScanVerify={(batch: string, token: string) => { setVerifyParams({ batch, token }); }}
+                      onAuthRequired={() => {
+                        setAuthMode('register');
+                        setAuthInitialRole('Customer');
+                        setIsAuthModalOpen(true);
+                      }}
                     />
                   </motion.div>
                 )}
@@ -227,6 +234,11 @@ function App() {
                 {activeRole === 'Block' && (
                   <motion.div key="block" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                     <BlockPage />
+                  </motion.div>
+                )}
+                {activeRole === 'Trade' && (
+                  <motion.div key="trade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <TradePage />
                   </motion.div>
                 )}
               </>
