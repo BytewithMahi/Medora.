@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Truck, QrCode, MapPin, Clock, ListChecks, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Truck, QrCode, MapPin, Clock, ListChecks, ShieldCheck, CheckCircle2, Flag, Activity } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import FloatingMedicine3D from './FloatingMedicine3D';
 import { supabase } from '../../lib/supabase';
@@ -24,6 +24,12 @@ export default function DistributorDashboard({ userEmail }: DistributorDashboard
         expiryMatching: '',
         compositionCorrect: ''
     });
+
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportIssueType, setReportIssueType] = useState('supply');
+    const [reportDescription, setReportDescription] = useState('');
+    const [isReporting, setIsReporting] = useState(false);
+    const [reportSuccess, setReportSuccess] = useState('');
 
     useEffect(() => {
         // Mock fetching location
@@ -81,6 +87,42 @@ export default function DistributorDashboard({ userEmail }: DistributorDashboard
             alert('Failed to verify shipment. Batch may not exist or network error.');
         } finally {
             setIsVerifying(false);
+        }
+    };
+
+    const handleReportSubmit = async () => {
+        if (!scanResult || !reportDescription) return;
+        setIsReporting(true);
+        setReportSuccess('');
+        try {
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const response = await fetch(`${API_URL}/api/report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    batchNo: scanResult,
+                    issueType: reportIssueType,
+                    description: reportDescription,
+                    reporterEmail: userEmail || 'logistics-ops@medora.net'
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                setReportSuccess(`Report submitted. Corrective action routed to ${reportIssueType === 'fake' ? 'Manufacturer' : 'Admin'}.`);
+                setTimeout(() => {
+                    setShowReportModal(false);
+                    setReportSuccess('');
+                    setReportDescription('');
+                }, 3000);
+            } else {
+                alert(result.error || 'Failed to submit report');
+            }
+        } catch (error) {
+            console.error('Report error:', error);
+            alert('A network error occurred.');
+        } finally {
+            setIsReporting(false);
         }
     };
 
@@ -242,6 +284,17 @@ export default function DistributorDashboard({ userEmail }: DistributorDashboard
                             </div>
                         </motion.div>
 
+                        {/* Reporting Action */}
+                        <motion.button
+                            initial={{ opacity: 0, x: 30 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: 0.45 }}
+                            onClick={() => setShowReportModal(true)}
+                            className="w-full py-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold hover:bg-rose-500/20 transition-all flex items-center justify-center gap-2"
+                        >
+                            <Flag className="w-5 h-5" /> Report Supply Discrepancy
+                        </motion.button>
+
                         {/* History Table */}
                         <motion.div
                             initial={{ opacity: 0, x: 30 }}
@@ -313,6 +366,98 @@ export default function DistributorDashboard({ userEmail }: DistributorDashboard
                             }
                         }}
                     />
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {showReportModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            className="bg-slate-900 border border-white/10 p-8 rounded-[2rem] w-full max-w-lg shadow-[0_0_100px_rgba(0,0,0,0.5)] relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500 via-purple-500 to-rose-500" />
+                            
+                            <button onClick={() => setShowReportModal(false)} className="absolute top-6 right-6 text-white/30 hover:text-white transition-colors">
+                                <Activity className="w-6 h-6 rotate-45" />
+                            </button>
+
+                            <div className="mb-8">
+                                <h3 className="text-3xl font-black text-white mb-2 flex items-center gap-3">
+                                    <Flag className="text-rose-500 w-8 h-8" /> Report Issue
+                                </h3>
+                                <p className="text-white/50 text-sm">
+                                    Report logistics errors or suspected counterfeit stock to host authorities.
+                                </p>
+                            </div>
+
+                            {reportSuccess ? (
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="py-12 text-center"
+                                >
+                                    <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                                    </div>
+                                    <p className="text-emerald-400 font-bold">{reportSuccess}</p>
+                                </motion.div>
+                            ) : (
+                                <div className="space-y-6">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2 block ml-1">Issue Category</label>
+                                        <select 
+                                            value={reportIssueType}
+                                            onChange={(e) => setReportIssueType(e.target.value)}
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-rose-500/50 transition-all outline-none appearance-none"
+                                        >
+                                            <option value="fake" className="bg-slate-900">Fake/Counterfeit Medicine</option>
+                                            <option value="supply" className="bg-slate-900">Supply Chain / Logistic Error</option>
+                                            <option value="tampering" className="bg-slate-900">Tampering / Damaged Seal</option>
+                                            <option value="other" className="bg-slate-900">Other Discrepancy</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2 block ml-1">Detailed Description</label>
+                                        <textarea
+                                            value={reportDescription}
+                                            onChange={(e) => setReportDescription(e.target.value)}
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white placeholder-white/20 h-32 focus:border-rose-500/50 transition-all outline-none resize-none"
+                                            placeholder="Provide specific details about the shipment discrepancy..."
+                                        ></textarea>
+                                    </div>
+
+                                    <button
+                                        onClick={handleReportSubmit}
+                                        disabled={isReporting || !reportDescription || !scanResult}
+                                        className={`w-full font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 ${
+                                            isReporting || !reportDescription || !scanResult
+                                            ? 'bg-rose-500/10 text-rose-500/30' 
+                                            : 'bg-rose-500 text-white hover:bg-rose-600 shadow-[0_0_30px_rgba(244,63,94,0.3)]'
+                                        }`}
+                                    >
+                                        {isReporting ? (
+                                            <>
+                                                <Activity className="w-5 h-5 animate-spin" /> Routing to Node Authority...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Flag className="w-5 h-5" /> Submit Official Report
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            )}
+                        </motion.div>
+                    </motion.div>
                 )}
             </AnimatePresence>
         </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, QrCode, Search, ShieldCheck, ShieldAlert, AlertOctagon, Activity, CheckCircle2, MapPin, Factory, Truck, Store, Flag } from 'lucide-react';
+import { User, QrCode, Search, ShieldCheck, ShieldAlert, AlertOctagon, Activity, CheckCircle2, MapPin, Factory, Truck, Store, Flag, Fingerprint } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import FloatingMedicine3D from './FloatingMedicine3D';
 import { supabase } from '../../lib/supabase';
@@ -10,10 +10,11 @@ type Status = 'verified' | 'pending' | 'suspicious' | null;
 
 interface CustomerDashboardProps {
     onScanVerify?: (batch: string, token: string) => void;
+    onAuthRequired?: () => void;
     userEmail?: string;
 }
 
-export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerDashboardProps) {
+export default function CustomerDashboard({ onScanVerify, onAuthRequired, userEmail }: CustomerDashboardProps) {
     const [scanInput, setScanInput] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
@@ -21,6 +22,15 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
     const [medicineData, setMedicineData] = useState<any>(null);
     const [ledgerEvents, setLedgerEvents] = useState<any[]>([]);
+    const [uidInput, setUidInput] = useState('');
+    const [hasConsent, setHasConsent] = useState(false);
+    const [authError, setAuthError] = useState('');
+    
+    // Reporting System States
+    const [reportIssueType, setReportIssueType] = useState('other');
+    const [reportDescription, setReportDescription] = useState('');
+    const [isReporting, setIsReporting] = useState(false);
+    const [reportSuccess, setReportSuccess] = useState('');
 
     // Integrity Questionnaire
     const [questions, setQuestions] = useState({
@@ -33,12 +43,32 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
         if (e) e.preventDefault();
         if (!scanInput) return;
 
+        if (!uidInput || !hasConsent) {
+            setAuthError("UID and Ownership Consent are required to access the ledger.");
+            return;
+        }
+
         setIsSearching(true);
+        setAuthError('');
         setResultStatus(null);
         setMedicineData(null);
         setLedgerEvents([]);
 
         try {
+            // Verify UID first
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('*')
+                .eq('request_id', uidInput)
+                .eq('role', 'Customer')
+                .single();
+
+            if (userError || !userData) {
+                setAuthError("Access Denied: Invalid Secure UID. Please register to obtain a node identity.");
+                setIsSearching(false);
+                return;
+            }
+
             const { data: medData, error: medError } = await supabase
                 .from('medicines')
                 .select('*')
@@ -148,6 +178,42 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
         }
     };
 
+    const handleReportSubmit = async () => {
+        if (!scanInput || !reportDescription) return;
+        setIsReporting(true);
+        setReportSuccess('');
+        try {
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            const response = await fetch(`${API_URL}/api/report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    batchNo: scanInput,
+                    issueType: reportIssueType,
+                    description: reportDescription,
+                    reporterEmail: userEmail || 'anonymous-customer@medora.net'
+                })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                setReportSuccess(`Report submitted successfully! The ${reportIssueType === 'other' ? 'Admin' : 'responsible party'} has been notified.`);
+                setTimeout(() => {
+                    setShowFeedbackModal(false);
+                    setReportSuccess('');
+                    setReportDescription('');
+                }, 3000);
+            } else {
+                alert(result.error || 'Failed to submit report');
+            }
+        } catch (error) {
+            console.error('Report error:', error);
+            alert('A network error occurred while submitting the report.');
+        } finally {
+            setIsReporting(false);
+        }
+    };
+
     const statusConfig = getStatusConfig();
     const StatusIcon = statusConfig?.icon as any;
 
@@ -176,38 +242,95 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
                     </p>
                 </motion.div>
 
-                {/* Search Bar */}
+                {/* Search Panel: UID, Batch, and Consent */}
                 <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                     className="w-full max-w-2xl mb-8 z-20"
                 >
-                    <form onSubmit={(e) => e.preventDefault()} className="relative group">
-                        <div className={`absolute -inset-1 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200 ${isSearching ? 'bg-emerald-400 animate-pulse' : 'bg-white/20'}`}></div>
-                        <div className="relative flex items-center bg-slate-950/80 backdrop-blur-xl border border-white/10 rounded-2xl p-2 shadow-2xl">
-                            <button
-                                type="button"
-                                onClick={() => setIsScanning(true)}
-                                className="p-4 text-white/50 hover:text-white transition-colors"
-                            >
-                                <QrCode className="w-6 h-6" />
-                            </button>
-                            <input
-                                type="text"
-                                value={scanInput}
-                                onChange={(e) => {
-                                    setScanInput(e.target.value);
-                                    setResultStatus(null); // Reset on type
-                                }}
-                                placeholder="Enter Batch Number (e.g., AX-792)"
-                                className="flex-grow bg-transparent text-white text-lg placeholder-white/30 px-2 focus:outline-none"
-                            />
-                            <div className="p-4 text-emerald-400">
-                                <Search className="w-6 h-6" />
+                    <div className="glassmorphism-dark p-8 rounded-[2rem] border border-white/10 shadow-2xl relative overflow-hidden group">
+                        <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+                        
+                        <div className="relative space-y-6">
+                            {/* Row 1: Batch & UID */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-1">Medicine Batch Number</label>
+                                    <div className="relative flex items-center bg-black/40 border border-white/10 rounded-xl px-4 py-3 focus-within:border-emerald-500/50 transition-all">
+                                        <Search className="w-4 h-4 text-white/30 mr-3" />
+                                        <input
+                                            type="text"
+                                            value={scanInput}
+                                            onChange={(e) => {
+                                                setScanInput(e.target.value);
+                                                setResultStatus(null);
+                                            }}
+                                            placeholder="e.g. AX-792"
+                                            className="bg-transparent text-white placeholder-white/20 focus:outline-none w-full font-medium"
+                                        />
+                                        <button type="button" onClick={() => setIsScanning(true)} className="ml-2 hover:text-emerald-400 transition-colors">
+                                            <QrCode className="w-5 h-5 opacity-50 hover:opacity-100" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest ml-1">Secure Node UID</label>
+                                    <div className="relative flex items-center bg-black/40 border border-white/10 rounded-xl px-4 py-3 focus-within:border-emerald-500/50 transition-all">
+                                        <Fingerprint className="w-4 h-4 text-white/30 mr-3" />
+                                        <input
+                                            type="text"
+                                            value={uidInput}
+                                            onChange={(e) => {
+                                                setUidInput(e.target.value);
+                                                setAuthError('');
+                                            }}
+                                            placeholder="6-char code"
+                                            className="bg-transparent text-white placeholder-white/20 focus:outline-none w-full font-mono"
+                                        />
+                                    </div>
+                                    <div className="flex justify-end pr-1">
+                                        <button 
+                                            type="button" 
+                                            onClick={onAuthRequired}
+                                            className="text-[10px] text-emerald-400/70 hover:text-emerald-400 font-bold uppercase tracking-tighter transition-colors"
+                                        >
+                                            Don't have a UID? Mint Secure Identity
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
+
+                            {/* Row 2: Consent */}
+                            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors group/consent">
+                                <div className="pt-1">
+                                    <input
+                                        type="checkbox"
+                                        id="consent-tick"
+                                        checked={hasConsent}
+                                        onChange={(e) => setHasConsent(e.target.checked)}
+                                        className="w-5 h-5 rounded border-white/10 bg-black/40 text-emerald-500 focus:ring-emerald-500/50 focus:ring-offset-0 cursor-pointer"
+                                    />
+                                </div>
+                                <label htmlFor="consent-tick" className="text-xs text-white/50 leading-relaxed cursor-pointer group-hover/consent:text-white/70 transition-colors">
+                                    <span className="text-emerald-400 font-bold block mb-1 uppercase tracking-tighter">Ownership Affirmation</span>
+                                    I affirm that I am the legal owner/possessor of this medicine and am accessing this ledger for authenticity verification purposes.
+                                    <span className="block mt-1 text-[10px] opacity-60 italic">Note: This tick mark serves as the cryptographic record of consent for node verification.</span>
+                                </label>
+                            </div>
+
+                            {authError && (
+                                <motion.div 
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-[11px] text-rose-300 flex items-center gap-2"
+                                >
+                                    <AlertOctagon className="w-4 h-4 shrink-0" />
+                                    {authError}
+                                </motion.div>
+                            )}
                         </div>
-                    </form>
+                    </div>
                 </motion.div>
 
                 {/* Integrity Questionnaire */}
@@ -258,8 +381,8 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
                                 onClick={() => handleSearch()}
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
-                                disabled={isSearching}
-                                className={`w-full relative overflow-hidden rounded-xl font-bold py-4 mt-6 transition-all ${isSearching ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-500 text-white hover:shadow-[0_0_20px_rgba(52,211,153,0.5)]'}`}
+                                disabled={isSearching || !uidInput || !hasConsent}
+                                className={`w-full relative overflow-hidden rounded-xl font-bold py-4 mt-6 transition-all ${isSearching || !uidInput || !hasConsent ? 'bg-emerald-500/10 text-emerald-400/50 cursor-not-allowed' : 'bg-emerald-500 text-white hover:shadow-[0_0_20px_rgba(52,211,153,0.5)]'}`}
                             >
                                 {isSearching ? (
                                     <span className="flex items-center justify-center gap-2">
@@ -267,7 +390,7 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
                                     </span>
                                 ) : (
                                     <span className="flex items-center justify-center gap-2">
-                                        Verify Product
+                                        {(!uidInput || !hasConsent) ? 'Unlock Ledger Access' : 'Verify Product'}
                                     </span>
                                 )}
                             </motion.button>
@@ -353,15 +476,17 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
                                     )}
                                 </div>
 
-                                {/* Report Button for Suspicious or Missing Data */}
-                                {(resultStatus === 'suspicious' || resultStatus === 'pending') && (
-                                    <button
-                                        onClick={() => setShowFeedbackModal(true)}
-                                        className="w-full mt-6 py-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold hover:bg-rose-500/20 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <Flag className="w-5 h-5" /> Report Suspicious Medicine
-                                    </button>
-                                )}
+                                {/* Universal Reporting Option */}
+                                <button
+                                    onClick={() => setShowFeedbackModal(true)}
+                                    className={`w-full mt-6 py-4 rounded-xl border font-bold transition-all flex items-center justify-center gap-2 ${
+                                        resultStatus === 'verified' 
+                                        ? 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white' 
+                                        : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
+                                    }`}
+                                >
+                                    <Flag className="w-5 h-5" /> {resultStatus === 'verified' ? 'Report a Concern' : 'Report Suspicious Medicine'}
+                                </button>
                             </div>
 
                             {/* Timeline Card */}
@@ -457,36 +582,98 @@ export default function CustomerDashboard({ onScanVerify, userEmail }: CustomerD
                     )}
                 </AnimatePresence>
 
-                {/* Feedback Modal Stub */}
+                {/* Professional Reporting Modal */}
                 <AnimatePresence>
                     {showFeedbackModal && (
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
                         >
                             <motion.div
                                 initial={{ scale: 0.9, y: 20 }}
                                 animate={{ scale: 1, y: 0 }}
                                 exit={{ scale: 0.9, y: 20 }}
-                                className="bg-slate-900 border border-white/10 p-8 rounded-3xl w-full max-w-md relative"
+                                className="bg-slate-900 border border-white/10 p-8 rounded-[2rem] w-full max-w-lg shadow-[0_0_100px_rgba(0,0,0,0.5)] relative overflow-hidden"
                             >
-                                <button onClick={() => setShowFeedbackModal(false)} className="absolute top-4 right-4 text-white/50 hover:text-white">✕</button>
-                                <h3 className="text-2xl font-bold text-white mb-4 flex items-center gap-2"><Flag className="text-rose-400" /> Report Issue</h3>
-                                <p className="text-white/60 mb-6">Please provide details about where you purchased this unverified medicine so we can investigate.</p>
-
-                                <textarea
-                                    className="w-full bg-black/50 border border-white/10 rounded-xl p-4 text-white placeholder-white/30 h-32 mb-6"
-                                    placeholder="Store name, location, and other details..."
-                                ></textarea>
-
-                                <button
-                                    onClick={() => setShowFeedbackModal(false)}
-                                    className="w-full bg-rose-500 text-white font-bold py-3 rounded-xl hover:bg-rose-400 transition-colors"
-                                >
-                                    Submit Report securely
+                                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-500 via-amber-500 to-rose-500" />
+                                
+                                <button onClick={() => setShowFeedbackModal(false)} className="absolute top-6 right-6 text-white/30 hover:text-white transition-colors">
+                                    <Activity className="w-6 h-6 rotate-45" />
                                 </button>
+
+                                <div className="mb-8">
+                                    <h3 className="text-3xl font-black text-white mb-2 flex items-center gap-3">
+                                        <Flag className="text-rose-500 w-8 h-8" /> Report Issue
+                                    </h3>
+                                    <p className="text-white/50 text-sm">
+                                        Your report will be routed to the appropriate node authority for immediate investigation.
+                                    </p>
+                                </div>
+
+                                {reportSuccess ? (
+                                    <motion.div 
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="py-12 text-center"
+                                    >
+                                        <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                                            <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+                                        </div>
+                                        <p className="text-emerald-400 font-bold">{reportSuccess}</p>
+                                    </motion.div>
+                                ) : (
+                                    <div className="space-y-6">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2 block ml-1">Issue Category</label>
+                                            <select 
+                                                value={reportIssueType}
+                                                onChange={(e) => setReportIssueType(e.target.value)}
+                                                className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-rose-500/50 transition-all outline-none appearance-none"
+                                            >
+                                                <option value="fake" className="bg-slate-900">Fake/Counterfeit Medicine</option>
+                                                <option value="supply" className="bg-slate-900">Supply Chain / Logistic Error</option>
+                                                <option value="tampering" className="bg-slate-900">Tampering / Damaged Seal</option>
+                                                <option value="other" className="bg-slate-900">Other Discrepancy</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2 block ml-1">Detailed Description</label>
+                                            <textarea
+                                                value={reportDescription}
+                                                onChange={(e) => setReportDescription(e.target.value)}
+                                                className="w-full bg-black/40 border border-white/10 rounded-xl p-4 text-white placeholder-white/20 h-32 focus:border-rose-500/50 transition-all outline-none resize-none"
+                                                placeholder="Please explain the issue... include location, date, and specific observations."
+                                            ></textarea>
+                                        </div>
+
+                                        <button
+                                            onClick={handleReportSubmit}
+                                            disabled={isReporting || !reportDescription}
+                                            className={`w-full font-black py-4 rounded-xl transition-all flex items-center justify-center gap-2 ${
+                                                isReporting || !reportDescription 
+                                                ? 'bg-rose-500/10 text-rose-500/30' 
+                                                : 'bg-rose-500 text-white hover:bg-rose-600 shadow-[0_0_30px_rgba(244,63,94,0.3)]'
+                                            }`}
+                                        >
+                                            {isReporting ? (
+                                                <>
+                                                    <Activity className="w-5 h-5 animate-spin" /> Routing to Node Authority...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Flag className="w-5 h-5" /> Submit Official Report
+                                                </>
+                                            )}
+                                        </button>
+                                        
+                                        <p className="text-[10px] text-center text-white/30 italic">
+                                            This report will be cryptographically linked to batch ${scanInput}.
+                                        </p>
+                                    </div>
+                                )}
                             </motion.div>
                         </motion.div>
                     )}

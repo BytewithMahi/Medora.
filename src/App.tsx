@@ -208,7 +208,15 @@ function App() {
                 )}
                 {activeRole === 'Customer' && (
                   <motion.div key="customer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <CustomerDashboard userEmail={userEmail} onScanVerify={(batch: string, token: string) => { setVerifyParams({ batch, token }); }} />
+                    <CustomerDashboard 
+                        userEmail={userEmail} 
+                        onScanVerify={(batch: string, token: string) => { setVerifyParams({ batch, token }); }} 
+                        onAuthRequired={() => {
+                            setAuthMode('register');
+                            setAuthInitialRole('Customer');
+                            setIsAuthModalOpen(true);
+                        }}
+                    />
                   </motion.div>
                 )}
                 {activeRole === 'Admin' && (

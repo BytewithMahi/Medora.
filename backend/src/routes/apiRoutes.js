@@ -21,6 +21,8 @@ const {
   verifyAction
 } = require('../controllers/verifyController');
 
+const { submitReport } = require('../controllers/reportController');
+
 const router = express.Router();
 
 // Apply General Rate Limiter default
@@ -33,6 +35,7 @@ router.use(apiLimiter);
 router.post('/verify-batch', verifyBatch);
 router.post('/verify-action', verifyAction);
 router.post('/scan-qr', scanQR);
+router.post('/report', submitReport);
 
 // Protected endpoints
 router.get('/history/:userId', requireAuth, getHistory);

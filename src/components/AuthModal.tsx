@@ -62,6 +62,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, ini
         }
         return () => window.removeEventListener('mousemove', handleMouseMove);
     }, [isOpen]);
+    
+    // Helper to generate unique 6-character UID for customers
+    // Pattern: numbers, special characters, and lowercase alphabets
+    const generateCustomerUID = () => {
+        const chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+        let result = '';
+        for (let i = 0; i < 6; i++) {
+            result += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return result;
+    };
 
     if (!isOpen) return null;
 
@@ -236,7 +247,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, ini
 
                                         <h2 className="text-4xl font-black text-white mb-4">
                                             {selectedRole} <br />
-                                            <span className="text-primary text-3xl opacity-80">{currentMode === 'forgot' ? 'Recovery' : currentMode === 'login' ? 'Access' : 'Registration'}</span>
+                                            <span className="text-primary text-3xl opacity-80">{currentMode === 'forgot' ? 'Recovery' : currentMode === 'login' ? 'Access' : (selectedRole === 'Customer' ? 'Identity Minting' : 'Registration')}</span>
                                         </h2>
 
                                         <p className="text-white/60 leading-relaxed mb-8">
@@ -266,7 +277,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, ini
                                     </button>
 
                                     <h3 className="text-2xl font-bold text-white mb-8">
-                                        {currentMode === 'forgot' ? `Recover ${selectedRole} Passkey.` : currentMode === 'login' ? `Welcome back, ${selectedRole}.` : `Initialize ${selectedRole} Node.`}
+                                        {currentMode === 'forgot' ? `Recover ${selectedRole} Passkey.` : currentMode === 'login' ? `Welcome back, ${selectedRole}.` : (selectedRole === 'Customer' ? `Initialize ${selectedRole} Node ID.` : `Initialize ${selectedRole} Node.`)}
                                     </h3>
 
                                     {error && (
@@ -477,11 +488,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, ini
                                                     if (selectedRole === 'Manufacturer') prefix = 'REQ-MFR-';
                                                     if (selectedRole === 'Distributor') prefix = 'REQ-DIST-';
                                                     if (selectedRole === 'Retailer') prefix = 'REQ-RET-';
-                                                    if (selectedRole === 'Customer') prefix = 'USR-CUST-';
-                                                    const randomNum = Math.floor(1000 + Math.random() * 9000);
-                                                    const reqId = `${prefix}${randomNum}`;
-
+                                                    
                                                     const isCustomer = selectedRole === 'Customer';
+                                                    let reqId = '';
+                                                    
+                                                    if (isCustomer) {
+                                                        reqId = generateCustomerUID();
+                                                    } else {
+                                                        const randomNum = Math.floor(1000 + Math.random() * 9000);
+                                                        reqId = `${prefix}${randomNum}`;
+                                                    }
+
 
                                                     const { error: insertError } = await supabase
                                                         .from('users')
@@ -507,9 +524,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode, ini
                                                     }
 
                                                     if (isCustomer) {
-                                                        // Automatically log them in to skip KYC
-                                                        if (onLogin) onLogin(selectedRole, email, passkey);
-                                                        onClose();
+                                                        setSuccess(`Identity minted! Your unique Secure Access UID is: ${reqId}\nSave this code - you will need it to verify medicine batches.`);
+                                                        setLoading(false);
                                                         return;
                                                     }
 
