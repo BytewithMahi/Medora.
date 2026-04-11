@@ -14,9 +14,14 @@ async function main() {
   console.log("\n=== Finalizing Access Control ===");
   try {
     console.log("Granting USER_MARKETPLACE_ROLE...");
-    const tx = await centralMarketplace.grantUserMarketplaceRole(userMarketplaceAddress);
-    await tx.wait();
+    const tx1 = await centralMarketplace.grantUserMarketplaceRole(userMarketplaceAddress);
+    await tx1.wait();
     console.log("✅ USER_MARKETPLACE_ROLE granted");
+
+    console.log("Granting MANUFACTURER_REGISTRY_ROLE...");
+    const tx2 = await centralMarketplace.grantManufacturerRegistryRole(manufacturerAddress);
+    await tx2.wait();
+    console.log("✅ MANUFACTURER_REGISTRY_ROLE granted");
   } catch (e) {
     console.log("Note:", e.message);
   }

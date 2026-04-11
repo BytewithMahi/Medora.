@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, ChevronRight, Loader2, TrendingUp, Plus } from 'lucide-react';
+import { Search, Filter, ChevronRight, Loader2, TrendingUp, Plus, AlertTriangle } from 'lucide-react';
 import { useWeb3 } from '../../../context/Web3Context';
 import { ethers } from 'ethers';
 import CreateTokenModal from './CreateTokenModal';
@@ -145,6 +145,14 @@ const TradeMarketplace = ({ onSelect, userRole }: TradeMarketplaceProps) => {
                     </button>
                 </div>
             </div>
+
+            {!contracts.registry && isConnected && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 text-center">
+                    <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+                    <h4 className="text-lg font-bold mb-1">Contract Initialization Error</h4>
+                    <p className="text-sm text-gray-400">The trading contracts could not be initialized. Please verify you are on the Sepolia network and that the application is correctly configured.</p>
+                </div>
+            )}
 
             {!isConnected && (
                 <div className="bg-primary/10 border border-primary/20 rounded-2xl p-6 text-center">

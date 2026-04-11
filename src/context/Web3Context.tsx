@@ -48,10 +48,22 @@ export const Web3Provider: React.FC<{ children: React.ReactNode }> = ({ children
     const registryAddress = import.meta.env.VITE_MANUFACTURER_REGISTRY;
     const marketplaceAddress = import.meta.env.VITE_USER_MARKETPLACE;
 
+    console.log("Web3Context: Initializing contracts...", {
+      registry: registryAddress,
+      marketplace: marketplaceAddress
+    });
+
     if (registryAddress && marketplaceAddress) {
-      const registry = new ethers.Contract(registryAddress, ManufacturerRegistryABI, currentSigner);
-      const marketplace = new ethers.Contract(marketplaceAddress, UserMarketplaceABI, currentSigner);
-      setContracts({ registry, marketplace });
+      try {
+        const registry = new ethers.Contract(registryAddress, ManufacturerRegistryABI, currentSigner);
+        const marketplace = new ethers.Contract(marketplaceAddress, UserMarketplaceABI, currentSigner);
+        setContracts({ registry, marketplace });
+        console.log("Web3Context: Contracts initialized successfully.");
+      } catch (error) {
+        console.error("Web3Context: Error initializing contracts:", error);
+      }
+    } else {
+      console.warn("Web3Context: Contract addresses missing in environment variables.");
     }
   }, []);
 

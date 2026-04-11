@@ -22,7 +22,7 @@ const CreateTokenModal: React.FC<CreateTokenModalProps> = ({ isOpen, onClose, on
         initialValue: ''
     });
 
-    const [isRegistered, setIsRegistered] = useState<boolean | null>(null);
+    const [isRegistered, setIsRegistered] = useState<boolean>(false);
 
     const checkRegistration = async () => {
         if (!contracts.registry || !account) return;
@@ -67,7 +67,19 @@ const CreateTokenModal: React.FC<CreateTokenModalProps> = ({ isOpen, onClose, on
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!isConnected || !contracts.registry) return;
+        
+        if (!isConnected) {
+            setStatus({ type: 'error', message: 'Wallet disconnected. Please reconnect to continue.' });
+            return;
+        }
+
+        if (!contracts.registry) {
+            setStatus({ 
+                type: 'error', 
+                message: 'Smart contracts not initialized. Check if you are on Sepolia and that environment variables are set.' 
+            });
+            return;
+        }
 
         try {
             setIsLoading(true);
@@ -89,9 +101,45 @@ const CreateTokenModal: React.FC<CreateTokenModalProps> = ({ isOpen, onClose, on
             console.log("Transaction submitted:", tx.hash);
             setStatus({ type: 'pending', message: 'Transaction submitted. Waiting for Network Confirmation...' });
             
-            await tx.wait();
+            const receipt = await tx.wait();
+            console.log("Transaction confirmed:", receipt);
 
-            setStatus({ type: 'success', message: `Market for ${formData.name} is now LIVE!` });
+            // Attempt to find token address in logs
+            let tokenAddress = tx.hash; // Fallback to hash if log parsing fails
+            try {
+                // The first log in createToken is usually the TokenCreated event
+                if (receipt.logs && receipt.logs.length > 0) {
+                    tokenAddress = receipt.logs[0].address; 
+                }
+            } catch (e) {
+                console.warn("Could not extract token address from logs:", e);
+            }
+
+            // === SYNC WITH SUPABASE ===
+            try {
+                const response = await fetch('/api/trade/record-deployment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        address: tokenAddress,
+                        name: formData.name,
+                        symbol: formData.symbol,
+                        totalSupply: formData.volume,
+                        basePrice: formData.initialValue,
+                        manufacturer: account
+                    })
+                });
+                const result = await response.json();
+                console.log("Supabase sync result:", result);
+            } catch (err) {
+                console.error("Failed to sync with Supabase:", err);
+            }
+            // =========================
+
+            setStatus({ 
+                type: 'success', 
+                message: `Market for ${formData.name} is now LIVE and recorded in Supabase!` 
+            });
             
             setTimeout(() => {
                 onSuccess();
@@ -103,13 +151,18 @@ const CreateTokenModal: React.FC<CreateTokenModalProps> = ({ isOpen, onClose, on
             
             let msg = error.reason || error.message || "Unknown Error";
             if (msg.includes("NotRegisteredManufacturer")) {
-                msg = "Wallet not registered! Use the registration bypass below.";
+                msg = "Wallet not registered! Use the registration button below.";
             }
 
             setStatus({ 
                 type: 'error', 
                 message: `Deployment Failed: ${msg}`
             });
+
+            // Extra debug for common role errors
+            if (msg.toLowerCase().includes("unauthorized") || msg.toLowerCase().includes("access")) {
+                console.warn("CRITICAL: ManufacturerRegistry may lack MANUFACTURER_REGISTRY_ROLE in CentralMarketplace.");
+            }
         } finally {
             setIsLoading(false);
         }
@@ -219,8 +272,8 @@ const CreateTokenModal: React.FC<CreateTokenModalProps> = ({ isOpen, onClose, on
                     <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3">
                         <div className="flex gap-4">
                             <Info className="w-6 h-6 text-primary shrink-0" />
-                            <p className="text-xs text-gray-400 leading-relaxed font-medium">
-                                Creating a token will deploy a new ERC20 contract on Sepolia. You will be set as the owner.
+                            <p className="text-[11px] text-gray-400 leading-relaxed font-medium">
+                                <span className="text-white font-bold">Heads up:</span> While your Medora account is verified, token deployment requires a <span className="text-primary">Blockchain Handshake</span>. This authorizes your current wallet (0x...) to act as a manufacturer on the Sepolia network.
                             </p>
                         </div>
                         
@@ -239,7 +292,7 @@ const CreateTokenModal: React.FC<CreateTokenModalProps> = ({ isOpen, onClose, on
                                     disabled={isLoading}
                                     className="w-full py-2 bg-red-500 text-white font-black rounded-lg text-xs uppercase hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
                                 >
-                                    {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Register Now"}
+                                    {isLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Register Wallet for Trade"}
                                 </button>
                             </motion.div>
                         )}
@@ -253,7 +306,7 @@ const CreateTokenModal: React.FC<CreateTokenModalProps> = ({ isOpen, onClose, on
 
                     <button 
                         type="submit"
-                        disabled={isLoading || !isConnected || isRegistered === false}
+                        disabled={isLoading || !isConnected || isRegistered === false || !contracts.registry}
                         className="w-full py-5 bg-primary text-black font-black rounded-2xl shadow-[0_0_30px_rgba(6,182,212,0.3)] hover:shadow-primary/50 transition-all flex items-center justify-center gap-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-tighter"
                     >
                         {isLoading ? (

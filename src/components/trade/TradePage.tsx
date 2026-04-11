@@ -124,6 +124,15 @@ const HeroSection = ({ onExplore }: { onExplore: () => void }) => {
             >
               Explore Assets
             </motion.button>
+            <motion.button 
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => window.open('/medora/trade?portal=manufacturer', '_blank')}
+              className="px-10 py-4 bg-purple-500/20 border border-purple-500/50 text-purple-400 font-bold rounded-2xl hover:bg-purple-500/30 transition-all text-lg flex items-center gap-2 border-glow"
+            >
+              <Cpu className="w-5 h-5" />
+              For Manufacturers
+            </motion.button>
           </div>
         </motion.div>
       </div>
@@ -315,14 +324,24 @@ const InvestmentSection = () => {
     );
 }
 
+import ManufacturerTradeDashboard from './internal/ManufacturerTradeDashboard';
+
 interface TradePageProps {
   userEmail?: string;
-  userRole?: string | null;
+  userRole?: string;
 }
 
 const TradePage = ({ userEmail, userRole }: TradePageProps) => {
-  const [activeView, setActiveView] = useState<'landing' | 'dashboard' | 'marketplace' | 'detail' | 'analytics'>('landing');
+  const [activeView, setActiveView] = useState<'landing' | 'dashboard' | 'marketplace' | 'detail' | 'analytics' | 'manufacturer-portal'>('landing');
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
+  const { isConnected } = useWeb3();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('portal') === 'manufacturer' && userRole === 'Manufacturer') {
+      setActiveView('manufacturer-portal');
+    }
+  }, [userRole]);
 
   const handleSelectAsset = (asset: any) => {
     if (asset) {
@@ -330,9 +349,10 @@ const TradePage = ({ userEmail, userRole }: TradePageProps) => {
       setActiveView('detail');
     }
   };
+
   return (
     <div className="min-h-screen bg-[#020617] text-white selection:bg-primary/50 relative overflow-x-hidden pt-16">
-      <TradeNavbar onNavigate={(v) => setActiveView(v)} activeView={activeView} />
+      <TradeNavbar onNavigate={(v: any) => setActiveView(v)} activeView={activeView} />
 
       <AnimatePresence mode="wait">
         {activeView === 'landing' && (
@@ -347,7 +367,7 @@ const TradePage = ({ userEmail, userRole }: TradePageProps) => {
               <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px] -z-10" />
               <div className="absolute bottom-1/4 right-0 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-[150px] -z-10" />
               <FeaturesSection />
-              <MarketplaceSection onSelect={() => setActiveView('detail')} />
+              <MarketplaceSection onSelect={handleSelectAsset} />
               <InvestmentSection />
             </div>
           </motion.div>
@@ -369,6 +389,11 @@ const TradePage = ({ userEmail, userRole }: TradePageProps) => {
               <AssetDetail asset={selectedAsset} onBack={() => setActiveView('marketplace')} />
             </motion.div>
           )}
+          {activeView === 'manufacturer-portal' && (
+            <motion.div key="manufacturer-portal" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="pt-10">
+              <ManufacturerTradeDashboard />
+            </motion.div>
+          )}
           {activeView === 'analytics' && (
              <motion.div key="analytics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-10 flex items-center justify-center min-h-[60vh]">
                 <div className="text-center">
@@ -381,7 +406,6 @@ const TradePage = ({ userEmail, userRole }: TradePageProps) => {
         </div>
       </AnimatePresence>
 
-      {/* Basic Footer */}
       <footer className="py-12 border-t border-white/5 text-center text-gray-500">
         <p className="text-sm">© 2026 Medora Trade Protocol. All rights reserved.</p>
         <div className="flex justify-center gap-6 mt-4">

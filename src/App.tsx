@@ -69,6 +69,12 @@ function App() {
       setAuthInitialRole('Admin');
       setIsAuthModalOpen(true);
     }
+
+    if (params.get('portal') === 'manufacturer' && !activeRole) {
+      setAuthMode('login');
+      setAuthInitialRole('Manufacturer');
+      setIsAuthModalOpen(true);
+    }
   }, []);
 
   return (
@@ -254,7 +260,12 @@ function App() {
         initialMode={authMode}
         initialRole={authInitialRole as any}
         onLogin={(role: any, email, passkey) => {
-          setActiveRole(role);
+          const pathname = window.location.pathname;
+          if (pathname === '/medora/trade') {
+            setActiveRole('Trade');
+          } else {
+            setActiveRole(role);
+          }
           setUserRole(role);
           setUserEmail(email);
           setUserPasskey(passkey || ''); // Save for crypto lookup

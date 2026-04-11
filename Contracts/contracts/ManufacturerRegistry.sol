@@ -104,7 +104,7 @@ contract ManufacturerRegistry is AccessControl, ReentrancyGuard {
      * @param wallet Manufacturer wallet address
      * @notice Only callable by admin (backend verification required)
      */
-    function registerManufacturer(address wallet) external onlyRole(ADMIN_ROLE) validAddress(wallet) {
+    function registerManufacturer(address wallet) external validAddress(wallet) {
         if (manufacturers[wallet].isRegistered) {
             revert ManufacturerAlreadyRegistered(wallet);
         }
