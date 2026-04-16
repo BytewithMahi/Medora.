@@ -53,7 +53,8 @@ const AdminDashboard: React.FC = () => {
     setActiveTest(testName);
     setAiTestResponse(null);
     try {
-      const url = `http://localhost:5000/api/${endpoint}`;
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const url = `${API_URL}/api/${endpoint}`;
       const res = await fetch(url, {
         method: body ? 'POST' : 'GET',
         headers: { 'Content-Type': 'application/json' },

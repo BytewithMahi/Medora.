@@ -189,7 +189,7 @@ function App() {
                 <VerificationPage
                   batch={verifyParams.batch}
                   token={verifyParams.token}
-                  currentUserRole={activeRole === 'Verify' || activeRole === null ? 'Customer' : activeRole}
+                  currentUserRole={(activeRole === 'Verify' || activeRole === null ? 'Customer' : activeRole) as any}
                   currentEmail={userEmail}
                   onBack={() => {
                     setVerifyParams(null);
@@ -245,7 +245,7 @@ function App() {
                 )}
                 {activeRole === 'Trade' && (
                   <motion.div key="trade" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <TradePage userEmail={userEmail} userRole={userRole} />
+                    <TradePage userEmail={userEmail} userRole={userRole as string} />
                   </motion.div>
                 )}
               </>

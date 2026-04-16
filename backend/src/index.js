@@ -12,17 +12,22 @@ const { initChatSockets } = require('./sockets/chat');
 const app = express();
 const server = http.createServer(app);
 
-// Allow Cross-Origin Requests properly in dev and production
+// Allow Cross-Origin Requests
+const allowedOrigin = process.env.FRONTEND_URL || '*';
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: allowedOrigin,
     methods: ['GET', 'POST']
   }
 });
 
 // Setup express security
-app.use(helmet());
-app.use(cors());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(cors({
+  origin: allowedOrigin
+}));
 
 // Parse JSON payload
 app.use(express.json());
