@@ -42,6 +42,91 @@ Medora integrates cutting-edge technologies to deliver a secure, transparent, an
     *   **Description**: Medora provides a clear and guided user flow: manufacturers register and get approval, create medicine batches with QR codes, supply chain updates are recorded at each stage, retailers verify products before selling, and customers scan QR codes for final authenticity verification. Optionally, manufacturers can launch tokens for users to invest.
     *   **Technology**: The user interface is developed with **React** and styled with **Tailwind CSS**, providing a responsive and intuitive experience across all stakeholder roles, connecting to all backend and blockchain services.
 
+## 🏗️ Smart Contracts Architecture
+
+Medora's blockchain layer is built with a highly decoupled, modular structure consisting of two core systems: **Supply Chain Traceability & Cryptographic Hash Chaining** and **Web3 Brand-Specific Trading (Medora Coin Marketplace)**.
+
+### 1. 🔗 Supply Chain Traceability & Hash Chaining System
+
+This subsystem records and cryptographically links supply chain events from the initial pharmaceutical batch synthesis to the end-consumer purchase.
+
+*   **`MedoraCentral.sol` (The Core Hub)**
+    *   **Role**: Serves as the central registry, validation engine, and single source of truth for the entire supply chain.
+    *   **Features**:
+        *   Maintains the canonical state of all medicine batches using a sequential hash-chaining structure.
+        *   Supports Role-Based Access Control (RBAC) via OpenZeppelin's `AccessControl`.
+        *   Enforces sequence verification (Producer ➔ Distributor ➔ Retailer ➔ Customer).
+        *   Rejects unauthorized out-of-order handoffs.
+        *   Exposes `verifyBatchAuthenticity` and `getBatchDetails` for instant authenticity auditing.
+    *   **Key Functions**: `registerBatch`, `verifyDistributor`, `verifyRetailer`, `verifyCustomer`.
+
+*   **`ProducerContract.sol`**
+    *   **Role**: Handles batch initialization and primary registration on behalf of authenticated medicine producers/manufacturers.
+    *   **Features**:
+        *   Generates a unique `batchId` by hashing the batch number, manufacturer details, production date, and block timestamp.
+        *   Creates the initial `medicineHash` by hashing the complete metadata (name, composition, expiry, etc.).
+        *   Invokes `MedoraCentral` to register the new batch with the producer's cryptographic signature.
+    *   **Key Functions**: `initializeBatch`, `getBatchMetadata`.
+
+*   **`DistributorContract.sol`**
+    *   **Role**: Manages intermediate verifications and receipt tracking for distributors.
+    *   **Features**:
+        *   Validates that the batch is legally registered and has not yet been accepted by another distributor.
+        *   Applies a new cryptographic step to the hash chain: `hash(previousHash, distributorAddress)`.
+        *   Invokes `verifyDistributor` on `MedoraCentral` to lock in the distributor handoff.
+
+*   **`RetailerContract.sol`**
+    *   **Role**: Registers pharmacy/retailer pre-sale validations.
+    *   **Features**:
+        *   Enforces that the distributor has already verified the batch.
+        *   Constructs a new step in the hash chain: `hash(previousHash, retailerAddress)`.
+        *   Invokes `verifyRetailer` on `MedoraCentral` to commit the retailer's sign-off.
+
+*   **`CustomerContract.sol`**
+    *   **Role**: Facilitates final end-user QR code scanning, purchase logging, and authenticity confirming.
+    *   **Features**:
+        *   Completes the final step in the cryptographic hash chain: `hash(previousHash, customerAddress)`.
+        *   Validates customer QR code inputs and stores offline scan coordinates/logs on-chain.
+        *   Tracks customer purchase histories on-chain, enabling patients to audit their own personal medicine cabinets.
+    *   **Key Functions**: `scanAndVerifyMedicine`, `checkAuthenticity`, `getPurchaseHistory`.
+
+*   **`MedoraSupplyChain.sol`**
+    *   **Role**: Alternative standalone lightweight ledger contract for role assignment, batch registration, and linear supply transfers. Perfect for testing and baseline integrations.
+
+---
+
+### 2. 💰 Web3 Brand-Specific Trading & Tokenomics System
+
+Medora lets pharmaceutical brands tokenize their reputation. Verified manufacturers can deploy brand-specific ERC-20 tokens that users can trade, purchase, or hold as a gauge of trust and AI-driven credibility scores.
+
+*   **`ManufacturerRegistry.sol`**
+    *   **Role**: Coordinates manufacturer approvals, token creation, and initial liquidity pooling.
+    *   **Features**:
+        *   Allows admins to register verified manufacturers.
+        *   Utilizes deterministic deployment (`Create2`) to instantiate individual brand-specific ERC-20 contracts securely.
+        *   Facilitates initial liquidity seeding by receiving manufacturer's ERC-20 allocations and corresponding ETH and routing them to the AMM pool.
+    *   **Key Functions**: `registerManufacturer`, `createToken`, `seedLiquidity`.
+
+*   **`ManufacturerToken.sol`**
+    *   **Role**: Standard ERC-20 token contract deployed dynamically for each approved manufacturer (e.g., *Pfizer Coin*, *Moderna Token*).
+    *   **Features**: Deploys with customized names, symbols, and total supply limits. Fully compliant with OpenZeppelin's ERC-20 specifications.
+
+*   **`CentralMarketplace.sol` (The AMM Engine)**
+    *   **Role**: The singleton hub holding liquidity reserves and serving as a decentralized exchange (DEX) and price oracle.
+    *   **Features**:
+        *   Maintains Uniswap v2-style constant product AMM pools ($x \cdot y = k$) for each brand-specific token.
+        *   Provides precise on-chain spot pricing: $\text{Price} = \frac{\text{ethReserve}}{\text{tokenReserve}}$.
+        *   Includes built-in slippage calculations and a standard 0.3% trading fee mechanism.
+    *   **Key Functions**: `initializePool`, `updateReserves`, `registerToken`, `getSpotPrice`, `getAmountOut`.
+
+*   **`UserMarketplace.sol`**
+    *   **Role**: Front-facing trading contract for end-investors and retail users.
+    *   **Features**:
+        *   Handles buying/selling of brand tokens with custom slippage protection (`minAmountOut` / `minEthOut`).
+        *   Logs every buy/sell trade securely.
+        *   Tracks real-time user portfolios, total cost basis, and live Profit and Loss (P&L) calculations on-chain.
+    *   **Key Functions**: `buyTokens`, `sellTokens`, `getUserPortfolio`, `calculatePnL`.
+
 ## ⚙️ Tech Stack
 
 *   **Frontend**: React, Tailwind CSS
@@ -113,16 +198,36 @@ REACT_APP_WEB3_RPC_URL=YOUR_INFURA_OR_ALCHEMY_SEPOLIA_RPC_URL
 
 ### 4. Smart Contract Deployment (Ethereum Sepolia)
 
-*   You will need to write and deploy the Medora smart contracts (e.g., for batch tracking and Medora Coin ERC-20 tokens) to the Ethereum Sepolia testnet.
-*   Once deployed, update the `REACT_APP_WEB3_CONTRACT_ADDRESS` and `backend/.env` with your contract addresses.
-*   This typically involves using Hardhat or Truffle. For example:
-    ```bash
-    # Assuming you have a `contracts` folder with your solidity files
-    # and a deployment script.
-    # cd contracts
-    # npx hardhat compile
-    # npx hardhat run scripts/deploy.js --network sepolia
-    ```
+Navigate to the `Contracts` folder, install requirements, compile, and execute the deployment:
+
+1. **Install Dependencies & Compile Contracts**:
+   ```bash
+   cd Contracts
+   npm install
+   npm run compile
+   ```
+
+2. **Configure Environment Variables**:
+   Create a `.env` file inside the `Contracts` directory:
+   ```env
+   SEPOLIA_URL=https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID
+   PRIVATE_KEY=YOUR_DEPLOYER_PRIVATE_KEY
+   ETHERSCAN_API_KEY=YOUR_ETHERSCAN_API_KEY
+   ```
+
+3. **Deploy & Bind Roles**:
+   ```bash
+   npm run deploy:sepolia
+   ```
+   This script compiles and deploys `MedoraSupplyChain` (simple baseline), `MedoraCentral` (hub), and the corresponding roles contracts (`ProducerContract`, `DistributorContract`, `RetailerContract`, `CustomerContract`), automatically binding their respective permissions on-chain.
+
+4. **Verify on Etherscan (Optional)**:
+   ```bash
+   npm run verify -- <contract_address>
+   ```
+
+5. **Update Application Configurations**:
+   Set `REACT_APP_WEB3_CONTRACT_ADDRESS` in `frontend/.env` and `CONTRACT_ADDRESS` in `backend/.env` to the newly deployed `MedoraCentral` contract address.
 
 ### 5. Database Setup (Supabase)
 
